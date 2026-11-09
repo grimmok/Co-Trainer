@@ -1,0 +1,79 @@
+{
+  "save": "",
+  "lang_db": "",
+  "pool_size": 6000,
+  "clubs": {
+    "Paris FC": {
+      "coach": {
+        "name": "Haribaert Kachinski",
+        "style": "Ballbesitzspiel",
+        "preferred_system": "Individuell",
+        "personality": "Ausgewogen",
+        "license": "C-Lizenz",
+        "focus": ["Offensive", "Entwickler", "Taktiker"],
+        "tendencies": ["Spielt offensiven Fußball", "Entwickelt Nachwuchsspieler", "Taktiktüftler", "Sehr ambitioniert", "Allseits bekannter Erfolgstyp"],
+        "coaching": {
+          "Offensive": "Sehr gut", "Defensive": "Gut", "Fitness": "Gut", "Torhüter": "Durchschnitt", "Taktik": "Sehr gut",
+          "Techniken": "Gut", "Ballbesitz": "Gut", "Standardsituationen": "Gut", "Nachwuchsarbeit": "Sehr gut"
+        },
+        "mental": {
+          "Anpassungsfähigkeit": "Sehr gut", "Autorität": "Sehr gut", "Zielstrebigkeit": "Sehr gut", "Führungsqualitäten": "Gut",
+          "Motivationsfähigkeit": "Gut"
+        }
+      },
+      "tactic": {
+        "name": "Vertikales Tiki-Taka (Paris FC)",
+        "style": "vertical_tikitaka",
+        "mentality": "Ausgewogen",
+        "slots": [
+          ["GK", 50, 93, "bpgk", "gk", "BTW", "TW"],
+          ["DR", 86, 72, "ifb", "pfb", "IFV", "PrAV"],
+          ["DC", 64, 77, "bpcb", "cb", "SpIV", "IV"],
+          ["DC", 36, 77, "cb", "cb", "IV", "IV"],
+          ["DL", 14, 72, "ifb", "hfb", "IAV", "AbAV"],
+          ["DM", 50, 61, "dlp", "dm", "TSm", "DM"],
+          ["MC", 50, 47, "mp", "sdm", "Spm", "As6"],
+          ["AMR", 85, 30, "wf", "twm", "AS", "ÄMF"],
+          ["AMC", 50, 31, "fr", "tcf", "F", "MaMS"],
+          ["AML", 15, 30, "w", "twm", "FL", "ÄMF"],
+          ["ST", 50, 11, "hsf", "cfo", "HRS", "MS"]
+        ],
+        "instructions_ip": {
+          "Passspiel": "Kürzer", "Tempo": "Geringer", "Angriffsbreite": "Viel enger", "Offensives Umschalten": "Konter",
+          "Kreative Freiheit": "Kreativer spielen", "Zeitspiel": "Standard", "Standards rausholen": "Ball im Spiel halten",
+          "Geduld": "Geduldig spielen", "Fernschüsse": "Ausgewogen", "Flankenstil": "Flache Flanken", "Dribbling": "Ausgewogen",
+          "Unterstützende Läufe": "Beide Flügel", "Aufbauspiel": "Zentrum", "Pass-Aufnahme": "Ausgewogen",
+          "Spielaufbau-Strategie": "Durch Pressing spielen", "Abstöße": "Kurz", "Spielaufbau TW": "Innenverteidiger"
+        },
+        "instructions_oop": {
+          "Pressinglinie": "Hohes Pressing", "Defensivlinie": "Höher", "Verhalten Defensivlinie": "Ausgewogen",
+          "Pressingauslösung": "Häufiger", "Defensives Umschalten": "Gegenpressing", "Tackling": "Standard",
+          "Torwart – Spielaufbau kurz": "Ja", "Pressingfalle": "Ausgewogen", "Gegnerische Flanken": "Ausgewogen"
+        },
+        "feedback": ["Spielaufbau", "Pressinglinie"]
+      }
+    },
+    "Ravenna": {
+      "coach": {
+        "name": "Haribaert Kachinski",
+        "style": "Ballbesitzspiel",
+        "preferred_system": "Individuell",
+        "personality": "Ausgewogen",
+        "tendencies": ["Spielt offensiven Fußball", "Verfolgt Jugendentwicklung aufmerksam", "Taktiktüftler", "Sehr ambitioniert", "Allseits bekannter Erfolgstyp"],
+        "coaching": {
+          "Fitness": "Schlecht", "Ballbesitz": "Schlecht", "Defensive": "Schlecht", "Nachwuchsarbeit": "Durchschnitt",
+          "Offensive": "Durchschnitt", "Standardsituationen": "Sehr schlecht", "Taktik": "Schlecht", "Techniken": "Schlecht",
+          "Torhüter": "Sehr schlecht"
+        },
+        "mental": {
+          "Anpassungsfähigkeit": "Durchschnitt", "Autorität": "Gut", "Führungsqualitäten": "Schlecht",
+          "Motivationsfähigkeit": "Schlecht", "Zielstrebigkeit": "Schlecht"
+        }
+      },
+      "tactic": {
+        "name": "4-1-1-3-1 DM Breit – Vertikales Tiki-Taka",
+        "style": "vertical_tikitaka"
+      }
+    }
+  }
+}

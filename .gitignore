@@ -1,0 +1,13 @@
+# Erzeugte Ausgabe (wird von extract.py bei jedem Lauf neu gebaut)
+FM-Scout.html
+
+# Python
+__pycache__/
+*.pyc
+
+# Lokale Claude-Einstellungen
+.claude/settings.local.json
+
+# Spielstände und entpackte Daten nie einchecken
+*.fm
+*.bin
