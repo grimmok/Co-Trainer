@@ -16,6 +16,8 @@ Die Seite soll:
 
 **Harte Vorgabe des Nutzers:** CA, PA und versteckte Attribute dürfen in der Oberfläche nie erscheinen. Das Potenzial wird nur als Text gezeigt, z. B. „Kann sich zu einem guten Zweitliga-Spieler entwickeln“.
 
+**Neue Richtung (09.11.):** FM-Scout wird zu **einem eigenständigen Windows-Programm** (`FM-Scout.exe`, ohne Batch-Datei, ohne erzeugte HTML-Seite), das öffentlich auf GitHub geteilt wird. Der vollständige Entwurf steht in [docs/superpowers/specs/2026-11-09-fm-scout-app-design.md](docs/superpowers/specs/2026-11-09-fm-scout-app-design.md). **Er ist vom Nutzer noch nicht freigegeben.** Vor der Freigabe wird nichts gebaut.
+
 ## Dateien
 
 | Datei | Zweck |
@@ -32,7 +34,9 @@ Nutzerdaten:
 
 - Spielstände: `%USERPROFILE%\Documents\Sports Interactive\Football Manager 26\games\` (der Ordner heißt „26“, das Spiel ist FM27 27.0.0)
   - `Haribaert Kachinski – Paris FC.fm`: aktuelle Karriere
-  - `Haribaert Kachinski – Ravenna.fm`: zuletzt gespeichert am 07.11. um 23:24 und damit derzeit der neueste Stand
+  - `Haribaert Kachinski – Ravenna.fm`: zuletzt gespeichert am 07.11. um 23:24; Scoutinggebiet „Italien“
+  - `Haribaert Kachinski – Ravenna europa.fm`: Testspielstand, identisch bis auf Scoutinggebiet „Europa“
+  - `Trainertest .fm`: Testspielstand mit zwei menschlichen Managern („Trainer Test“ C-Lizenz, „Trainer Test Zwei“ Pro-Lizenz); wird nicht mehr gebraucht
 - Spielinstallation: `G:\SteamLibrary\steamapps\common\Football Manager 27`
 - Sprachdatenbank (Wettbewerbs- und Rollennamen): `shared\data\database\db\2700\2700_fm\lang_db.dat`
 
@@ -56,6 +60,14 @@ Nutzerdaten:
    - FM27-Rollennamen;
    - Schlüsselattribute des Halbraumstürmers laut Screenshot.
 7. Eine kurze Vorstellung des Programms für einen FM-Discord-Mod-Kanal geschrieben (nur im Chat).
+8. **Spielstandwahl (09.11.):** `find_save` lässt Sicherungen (`backup`, `autosave`) aus. `python extract.py --list` zeigt alle Spielstände mit Nummer; `python extract.py 2` nimmt Nummer 2.
+9. **Rollentest-Hilfe (09.11.):** `FMS_ROLES=1` gibt für jede Taktik alle 22 Fingerabdrücke aus, unbekannte als `UNBEKANNT`. Die Schlüssel lassen sich direkt in `ROLE_FP` kopieren.
+10. **Spielstil aus dem Taktikkopf (09.11.):** Stilname und 4-Zeichen-Code werden gelesen (`STYLE_CODES` in `extract.py`: `TREV` → `vertical_tikitaka`, `EGEG` → `gegenpress`) und haben Vorrang vor `config.json`. Die Oberfläche übernimmt den Stil, sobald er sich im Spielstand ändert (`styleSeen` im `localStorage`).
+    - Ravenna: aktive Taktik „Taktik“ = **Gegenpressing**, „4-1-1-3-1 DM Breit – Vertikales Tiki-Taka“ = Vertikales Tiki-Taka. **Vom Nutzer noch zu bestätigen.**
+11. **fmsave getestet (09.11.):** siehe Abschnitt „Abgleich mit fmsave“.
+12. **Brainstorming zum Umbau als Programm (09.11.):** Ablauf, Bereiche, Transfer-Informationsstufen, neuer Taktik-Reiter, Stil (dunkel/hell) mit dem Nutzer festgelegt → Design-Dokument (siehe oben). Entwürfe als HTML in `.superpowers/brainstorm/` (lokal, nicht im Repo): `ablauf-v2.html`, `transfer-werte.html`, `stil-v2.html`.
+13. **Trainerbewertungen untersucht (09.11.):** mit `Trainertest .fm` und Screenshots. Ergebnis siehe „Trainer des menschlichen Managers“.
+14. **Scoutinggebiet teilweise dekodiert (09.11.):** siehe „Scoutinggebiet“.
 
 ## Erkenntnisse zum Spielstand-Format
 
@@ -141,6 +153,32 @@ Danach folgen **22 Slot-Einträge**, abwechselnd mit Ball und gegen den Ball:
 - **Exportierte Taktiken (`.fmf`)** sind verschlüsselt und nicht lesbar.
 - Der Datensatz `I RB` in `tactics_man` (AI-artig, mit `05 u16`-Positionscodes) enthält die Aufstellung eines Vereins (Spieler-IDs), aber keine Rollen.
 
+### Abgleich mit fmsave (09.11.)
+
+Bibliothek [rhiever/fmsave](https://github.com/rhiever/fmsave) 0.11.0 (MIT), lokal geklont nach `%USERPROFILE%\Projekte\fmsave`, venv `.venv` mit Python 3.12 (über `python -m uv`). Ravenna-Spielstand ist Build 27.0.0+2493426; fmsave kennt offiziell nur +2486695, liest aber trotzdem fast alles (Ausnahmen: `officials`, `squad_planner`, `sponsorships`). Vergleichsskripte lagen im Scratchpad.
+
+- **Gleich:** Bei allen 51.208 Spielern, die wir finden, stimmen CA/PA, alle Attribute und Positionen exakt überein. Kontostand stimmt (1.185.695 £ = 1.380.268 €), ebenso die vier per Screenshot geprüften Verträge, Taktiknamen und Stil „Gegenpressing“.
+- **Persönlichkeit falsch angenommen:** Richtige Bytefolge (bei 51.208 von 51.208 Spielern): Anpassung, Ehrgeiz, **Loyalität, Druck, Professionalität, Sportsgeist, Temperament, Kontroversität**. `willingness()` liest Loyalität deshalb aus dem falschen Byte (`p[3]` = Druck statt `p[2]`). Noch nicht korrigiert.
+- **fmsave findet mehr:** 86.402 statt 51.210 Spieler. Im Ravenna-Kader fehlen bei uns u. a. Zagré, Ilari und Vinícius.
+- **Abweichungen bei uns:** Vertragsende bei rund 12.000 Spielern anders (z. B. De Silvestri: wir 29.07.2026, fmsave 30.06.2027), Gehalt bei rund 3.000.
+- **Neu verfügbar:** Kaderstatus (`squad_status`, z. B. `regular_starter`, `emergency_backup`), Leihen, Scoutingbudget, Staff-Attribute (für diesen Build bestätigt). Die Attribute des menschlichen Managers liefert fmsave nicht (`None`).
+- fmsave gibt fast alle Felder als „unconfirmed“ an; gegen das Spiel bestätigt sind für FM27 nur Staff-Felder.
+- **fmsave scheitert** an einem Spielstand mit zwei menschlichen Managern (`Trainertest .fm`: „FM27 summary does not fit its structured clock layout“). Deshalb muss der eigene Leser als Rückfall bleiben.
+
+### Trainer des menschlichen Managers (09.11.)
+
+- Personenkopf in `game_db` wie bei anderen Personen, aber Vorname nicht aus der Namenstabelle (`Vorname-ID 00 Nachname-ID 00 ff×4 00 len "Voller Name" Geburtsdatum`). Persönlichkeit wie üblich bei `dob + 22` (beim Nutzer achtmal 10).
+- **Coaching- und mentale Bewertungen (Offensive, Taktik, Torhüter, Autorität …) wurden nicht gefunden**: weder am Personenkopf, noch in `humans` (nur UI-Einstellungen, 2,6–8 KB), noch im Staff-Block-Aufbau von fmsave, noch per Mustersuche (Skala 1–20 und 1–100) über alle 1.187 Abschnitte. Schluss: Das Spiel **berechnet** sie sehr wahrscheinlich aus Lizenz, Spielerkarriere, Ansehen und Erfahrung.
+- „Bevorzugtes System“ und „Taktischer Stil“ im Trainerprofil leitet das Spiel laut Nutzer aus der eingestellten Taktik ab; ohne Taktik sind sie bedeutungslos.
+- **Trainertendenzen** sind relevant (FM27 zählt sie bei der Spielerüberzeugung, Bildschirm „Taktische Effektivität“). Bei beiden Testtrainern identisch, also nicht von der Lizenz abhängig. Ob sie gespeichert sind, ist ungeklärt.
+
+### Scoutinggebiet (09.11.)
+
+- Einstellung im Spiel: Weltweit / Europa / Südeuropa / Italien (beim Ravenna-Spielstand). Die Spielerdatenbank im Spiel zeigt dann automatisch Spieler dieses Gebiets.
+- Vergleich `Ravenna.fm` (Italien) gegen `Ravenna europa.fm` (Europa): In `scout_man` ändert sich nur wenig. Ein 4-Zeichen-Code wechselt von `AcSP` (Italien) zu `blcP` (Europa), ca. Offset 1840. Ein Filterblock (`rfip … lvlf 01 12 88 13 rllp …`, enthält den Wert 5000) wandert dabei von Offset ~1269 hinter den Block `rrad … negm`.
+- Weitere geänderte Abschnitte (vermutlich Nebeneffekte): `humans`, `memory_pools`, `media_man`, `training_man`, `news`, `backroom_advice_manager`.
+- Offen: Codes für Weltweit und Südeuropa; ob „Italien“ allgemein „eigenes Land“ heißt; Zuordnung Land → Region/Kontinent.
+
 ## Getroffene Entscheidungen
 
 - Der Spielstand wird **nur gelesen, nie verändert**.
@@ -169,23 +207,39 @@ Danach folgen **22 Slot-Einträge**, abwechselnd mit Ball und gegen den Ball:
 - **Unbekannter Einfluss der Spieleranweisungen:** Ob individuelle Spieleranweisungen die Unterblöcke verändern und damit den Fingerabdruck brechen, ist ungeprüft.
 - **Fehlende Spieler:** Bei Paris fehlen einzelne Spieler, z. B. Otávio und Ikoné (Ikoné steht aber in der Aufstellung). Leihspieler werden nicht immer erkannt.
 - **Kader nicht gefiltert:** Der Kader enthält Reserve und Jugend (Paris: 78 Spieler). Es gibt keinen Filter auf die erste Mannschaft.
-- **Nicht ausgelesen werden:** Scoutingbudget, Trainer- und Staffattribute sowie Teamanweisungen.
+- **Nicht ausgelesen werden:** Scoutingbudget, Scoutinggebiet, Staffattribute, Trainertendenzen und Teamanweisungen (fmsave liest Scoutingbudget und Staffattribute anderer Trainer).
+- **Persönlichkeitsreihenfolge falsch:** siehe Abgleich mit fmsave; Korrektur wartet auf Screenshot-Abgleich (z. B. Viola: fmsave liest Loyalität 16, Druck 12, Professionalität 18, Kontroversität 3).
 - **Torwartwahl:** Durch die Gewichtung „Ballspielender Torwart“ wählt das Programm bei Paris Nkambadio statt Trapp.
-- **Spielstandwahl nicht gefiltert:** `find_save` nimmt den neuesten `.fm` aus *allen* `Football Manager*\games`-Ordnern. Damit kann auch `last save overwrite backup.fm` oder eine andere Karriere gewählt werden.
-- **Ungeprüfte Werte:** Das garantierte Mindestbudget für die nächste Saison ist nicht mit dem Spiel abgeglichen. Persönlichkeitsreihenfolge und Wechselchance sind Annahmen.
+- **Spielstandwahl:** Backups sind ausgeschlossen, aber `find_save` nimmt weiterhin den neuesten Spielstand *jeder* Karriere (keine Einschränkung auf einen Manager).
+- **Ungeprüfte Werte:** Das garantierte Mindestbudget für die nächste Saison ist nicht mit dem Spiel abgeglichen. Die Wechselchance ist eine Annahme.
 
 ## Nächste Schritte
+
+### A. Umbau zum Programm (Vorrang)
+
+1. **Design-Dokument vom Nutzer freigeben lassen:** `docs/superpowers/specs/2026-11-09-fm-scout-app-design.md`. Dabei die als „Entscheidung von Claude“ markierten Punkte bestätigen lassen (fmsave als Paket, `.exe` unsigniert, MIT-Lizenz, max. ~50 Vorschläge je Filter, Informationsstufe gespeichert).
+2. **Vom Nutzer benötigt:**
+   - Zwei weitere Spielstände nach dem Muster „Ravenna europa“: Scoutinggebiet „Weltweit“ und „Südeuropa“, sonst unverändert.
+   - Welches Scoutinggebiet im Paris-Spielstand eingestellt ist (Test, ob „Italien“ = „eigenes Land“).
+   - Screenshot der Persönlichkeit eines Spielers (z. B. Viola), um die Reihenfolge zu bestätigen.
+   - Bestätigung, dass die aktive Ravenna-Taktik „Taktik“ auf Gegenpressing steht.
+3. Nach Freigabe: Umsetzungsplan schreiben (Skill `superpowers:writing-plans`), dann bauen.
+4. Beim Bauen klären: Zuordnung Land → Region/Kontinent für das Scoutinggebiet; Trainertendenzen im Spielstand suchen (sonst Auswahl pro Karriere im Programm).
+
+### B. Dekodierung und Datenqualität (laufend)
 
 1. **Rollentest abschließen.** Ablauf:
    - Der Nutzer benennt eine Kopie seiner Taktik in „Test 1“ (dann „Test 2“ usw.) um.
    - Er stellt an allen Positionen neue Rollen ein, mit Ball und gegen den Ball. Doppelte Positionen bekommen zwei verschiedene Rollen.
    - Spieleranweisungen bleiben unverändert.
    - Er speichert und schickt die ausgefüllte Liste (TW, RV, IV rechts, IV links, LV, DM, ZM, ZOM, RA, LA, ST jeweils „mit Ball / gegen den Ball“).
-   - Danach die Taktik namens „Test N“ parsen (`read_tactics` liefert alle Taktiken) und die neuen Fingerabdrücke in `ROLE_FP` eintragen.
+   - Danach `FMS_ROLES=1` setzen und `extract.py` laufen lassen; die Zeilen der Taktik „Test N“ mit der Liste abgleichen und die neuen Fingerabdrücke in `ROLE_FP` eintragen.
    - Fehlende Rollen in `ROLES` in `app.html` ergänzen, mit Schlüsselattributen laut FM27.
    - Geplant sind 4–5 Durchgänge, am Ende einer mit anderer Formation (z. B. 3-4-3) für Flügelverteidiger, Libero sowie RM/LM mit Ball.
 2. Prüfen, ob Spieleranweisungen den Fingerabdruck verändern. Falls ja: nur die rollenbestimmenden Unterblöcke vergleichen.
-3. Teamanweisungen aus dem Kopf der Taktik dekodieren. Zwischen Name und erstem Slot stehen rund 16 Byte Einstellungen und der Stil-Code, z. B. `TREV` (vertikal) oder `EGEG` (Gegenpressing). Damit würde `config.json` für Taktiken überflüssig.
-4. `find_save` auf Karrieren des Nutzers einschränken: Backups ausschließen und ggf. eine Auswahlliste anbieten.
-5. Kaderfilter für die erste Mannschaft; fehlende Spieler (Otávio) und Leihspieler klären.
-6. Optional: Scoutingbudget sowie Trainer- und Staffattribute aus `game_db` lesen.
+3. Teamanweisungen aus dem Kopf der Taktik dekodieren (Stil-Code ist erledigt). Aufbau nach dem Namen: 12×`00`, 16 Byte Einstellungen, `00 00 ff`, `len u32`, Stilname, Code4. Bisher gesehen:
+   - „Taktik“ (Gegenpressing): `04 01 04 07 02 03 80 00 00 00 0a 40 50 22 62 90`
+   - „4-1-1-3-1 … Tiki-Taka“: `04 03 04 07 02 03 88 10 8a 10 0a 10 61 22 64 80`
+   - Wirkt bitgepackt. Zum Dekodieren: Kopie einer Taktik, jeweils **eine** Anweisung ändern, speichern, vergleichen.
+4. Kaderfilter für die erste Mannschaft über `squad_status` aus fmsave; fehlende Spieler (Otávio, Zagré, Ilari, Vinícius) und Leihspieler sind mit fmsave gelöst.
+5. ~~Spielstandwahl~~ erledigt. ~~Trainerbewertungen lesen~~ verworfen (werden vom Spiel berechnet).

@@ -214,7 +214,10 @@ const KEY='fmscout:'+(DATA?DATA.meta.club+'|'+DATA.meta.manager:'');
 let S=load();
 function load(){let s={};try{s=JSON.parse(localStorage.getItem(KEY))||{};}catch(e){}
  const defF=(DATA&&DATA.tactic&&DATA.tactic.slots)?DATA.tactic.name:'4-1-1-3-1 DM Breit';
- if(!FORMATIONS[s.formation]||(DATA&&DATA.tactic&&DATA.tactic.source==='Spielstand'&&s.tacticSeen!==DATA.tactic.name)){s.formation=defF;s.tacticSeen=DATA&&DATA.tactic&&DATA.tactic.name;}s.roles=s.roles||{};s.style=s.style||(DATA&&DATA.tactic&&DATA.tactic.style)||'vertical_tikitaka';
+ if(!FORMATIONS[s.formation]||(DATA&&DATA.tactic&&DATA.tactic.source==='Spielstand'&&s.tacticSeen!==DATA.tactic.name)){s.formation=defF;s.tacticSeen=DATA&&DATA.tactic&&DATA.tactic.name;}s.roles=s.roles||{};
+ const tStyle=DATA&&DATA.tactic&&DATA.tactic.style;
+ if(tStyle&&DATA.tactic.source==='Spielstand'&&s.styleSeen!==tStyle){s.style=tStyle;s.styleSeen=tStyle;}
+ s.style=s.style||tStyle||'vertical_tikitaka';
  s.ipw=s.ipw??60;s.f=s.f||{pos:'',age:35,will:25,budget:true,wage:true,maxRel:'',sort:'gain'};s.star=s.star||[];return s;}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
 
@@ -378,7 +381,7 @@ function vTaktik(){const c=DATA.coach||{},an=analyze();const st=STYLES[S.style];
   <div class="row"><label class="f">Formation<select onchange="S.formation=this.value;S.selSlot=null;save();render()">${Object.keys(FORMATIONS).map(k=>`<option ${k===S.formation?'selected':''}>${esc(k)}</option>`).join('')}</select></label>
   <label class="f">Spielstil<select onchange="S.style=this.value;WCACHE.clear();save();render()">${Object.entries(STYLES).map(([k,v])=>`<option value="${k}" ${k===S.style?'selected':''}>${esc(v.name)}</option>`).join('')}</select></label>
   <label class="f">Gewicht mit Ball: ${S.ipw} %<input type="range" min="0" max="100" step="10" value="${S.ipw}" onchange="S.ipw=+this.value;save();render()"></label></div>
-  <p class="note">${TCFG.source==='Spielstand'?`Aus dem Spielstand gelesen: „${esc(TCFG.name)}“ – Positionen und Rollen mit/gegen den Ball${TCFG.unknown_roles?` (${TCFG.unknown_roles} Rolle(n) nicht erkannt, mit „?“ markiert – bitte unter Kader-Analyse prüfen)`:''}.${(TCFG.saved||[]).length>1?` Weitere gespeicherte Taktiken: ${TCFG.saved.filter(n=>n!==TCFG.name).map(esc).join(', ')}.`:''}`:`Taktik aus <code>config.json</code>: „${esc(TCFG.name||'')}“ (im Spielstand ist keine eigene Taktik gespeichert).`} Die Rollen pro Position kannst du unter <a href="#kader">Kader-Analyse</a> per Klick auf die Position ändern.</p></div>
+  <p class="note">${TCFG.source==='Spielstand'?`Aus dem Spielstand gelesen: „${esc(TCFG.name)}“ – Positionen und Rollen mit/gegen den Ball${TCFG.style_name?`, Spielstil „${esc(TCFG.style_name)}“`:''}${TCFG.unknown_roles?` (${TCFG.unknown_roles} Rolle(n) nicht erkannt, mit „?“ markiert – bitte unter Kader-Analyse prüfen)`:''}.${(TCFG.saved||[]).length>1?` Weitere gespeicherte Taktiken: ${TCFG.saved.filter(n=>n!==TCFG.name).map(esc).join(', ')}.`:''}`:`Taktik aus <code>config.json</code>: „${esc(TCFG.name||'')}“ (im Spielstand ist keine eigene Taktik gespeichert).`} Die Rollen pro Position kannst du unter <a href="#kader">Kader-Analyse</a> per Klick auf die Position ändern.</p></div>
  <div class="card"><h2>Trainer ↔ Taktik</h2><div class="row"><div class="fit" style="--v:${fit};--c:${fit>=65?'var(--good)':fit>=45?'var(--warn)':'var(--bad)'};width:60px;height:60px;font-size:18px"><span style="width:50px;height:50px">${fit}</span></div>
   <div><b>${esc(c.name||'Trainer')}</b><div class="psub">Taktischer Stil: ${esc(c.style||'–')} · Bevorzugtes System: ${esc(c.preferred_system||'–')}</div></div></div>
   <ul class="tips">

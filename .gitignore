@@ -11,3 +11,6 @@ __pycache__/
 # Spielstände und entpackte Daten nie einchecken
 *.fm
 *.bin
+
+# Entwürfe aus dem Brainstorming
+.superpowers/

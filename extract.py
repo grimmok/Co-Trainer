@@ -1,7 +1,9 @@
 ﻿"""FM-Scout: liest einen Football-Manager-27-Spielstand (.fm) und erzeugt die Analyse-Seite.
 
-Aufruf:  python extract.py [Pfad\\zum\\Spielstand.fm]
-Ohne Pfad wird der zuletzt gespeicherte Spielstand verwendet.
+Aufruf:  python extract.py [Pfad\\zum\\Spielstand.fm | Nummer]
+         python extract.py --list      (Spielstände mit Nummer auflisten)
+Ohne Angabe wird der zuletzt gespeicherte Spielstand verwendet (Sicherungen ausgenommen).
+FMS_ROLES=1 gibt die Rollen-Fingerabdrücke aller Taktiken aus (für den Rollentest).
 Der Spielstand wird nur gelesen, nie verändert.
 """
 import array, bisect, datetime, glob, json, math, os, re, struct, sys, time
@@ -29,14 +31,35 @@ def log(*a):
 
 
 # ---------------------------------------------------------------- Dateien finden
-def find_save(arg):
-    if arg:
-        return arg
+SKIP_SAVE = re.compile(r'backup|auto ?save|autosave', re.I)
+
+
+def list_saves():
+    """Eigene Spielstände, neueste zuerst. Sicherungen (z. B. 'last save overwrite backup.fm') werden ausgelassen."""
     docs = os.path.join(os.path.expanduser('~'), 'Documents', 'Sports Interactive')
     cands = glob.glob(os.path.join(docs, 'Football Manager*', 'games', '*.fm'))
+    cands = [c for c in cands if not SKIP_SAVE.search(os.path.basename(c))]
+    return sorted(cands, key=os.path.getmtime, reverse=True)
+
+
+def find_save(arg):
+    if arg and not arg.isdigit():
+        if not os.path.exists(arg):
+            sys.exit(f'Spielstand nicht gefunden: {arg}')
+        return arg
+    cands = list_saves()
     if not cands:
         sys.exit('Kein Spielstand gefunden. Bitte Pfad angeben: python extract.py "...\\Spielstand.fm"')
-    return max(cands, key=os.path.getmtime)
+    k = int(arg) if arg else 1          # Nummer aus "python extract.py --list"
+    if not 1 <= k <= len(cands):
+        sys.exit(f'Es gibt nur {len(cands)} Spielstände (siehe python extract.py --list).')
+    return cands[k - 1]
+
+
+def print_saves():
+    for k, c in enumerate(list_saves(), 1):
+        t = time.strftime('%d.%m.%Y %H:%M', time.localtime(os.path.getmtime(c)))
+        print(f'{k:3}  {t}  {os.path.basename(c)}')
 
 
 def find_lang_db(cfg):
@@ -347,6 +370,8 @@ ROLE_FP = {
     ('oop', 35, ((38,), (54,))): ('twm', 'ÄMF', 'Äußerer Mittelfeldspieler'),
     ('oop', 42, ((43,), (54,))): ('cfo', 'MS', 'Mittelstürmer'),
 }
+# Stil-Code im Taktikkopf -> Schlüssel in STYLES (app.html). Weitere Codes erst nach Bestätigung eintragen.
+STYLE_CODES = {'TREV': 'vertical_tikitaka', 'EGEG': 'gegenpress'}
 # Ersatzrolle, wenn ein Fingerabdruck (noch) unbekannt ist
 ROLE_DEFAULT = {'GK': ('gk', 'gk'), 'SW': ('cb', 'cb'), 'DC': ('cb', 'cb'), 'DR': ('fb', 'fb'), 'DL': ('fb', 'fb'),
                 'WBR': ('wb', 'wb'), 'WBL': ('wb', 'wb'), 'DM': ('dm', 'dm'), 'MC': ('cm', 'cm'),
@@ -385,6 +410,17 @@ def read_tactics(frames, names):
         ln = m.group(2)[0]
         name = t[m.end():m.end() + ln].decode('utf-8', 'replace').strip()
         p = t.find(b'\x44\x00\x02', m.end() + ln, m.end() + ln + 200)
+        # Kopf zwischen Name und erstem Slot: ~16 Byte Einstellungen (noch nicht dekodiert),
+        # dann "ff len u32 Stilname Code4", z. B. "Gegenpressing" + "EGEG", "Vertikales Tiki-Taka" + "TREV"
+        style_name = style_code = None
+        if p != -1:
+            sm = re.search(rb'\xff([\x02-\x40])\x00\x00\x00', t[m.end() + ln:p])
+            if sm:
+                s0 = m.end() + ln + sm.end()
+                sl = sm.group(1)[0]
+                if s0 + sl + 4 == p:
+                    style_name = t[s0:s0 + sl].decode('utf-8', 'replace')
+                    style_code = t[s0 + sl:p].decode('latin-1')
         ents = []
         while p != -1 and len(ents) < 22:
             e = _tactic_entry(t, p)
@@ -395,18 +431,28 @@ def read_tactics(frames, names):
         if len(ents) != 22 or not all(e['pos'] for e in ents):
             continue
         slots, unknown = [], 0
+        dbg = os.environ.get('FMS_ROLES')
+        if dbg:
+            kind = 'aktiv' if m.group(1) == b'\x02' else 'eigene'
+            print(f'\nTaktik "{name}" ({kind})')
         for i in range(0, 22, 2):
             a, b = ents[i], ents[i + 1]
-            ip = ROLE_FP.get(('ip', a['grp'][0] if a['grp'] else -1, a['subs']))
-            oop = ROLE_FP.get(('oop', b['grp'][0] if b['grp'] else -1, b['subs']))
+            k_ip = ('ip', a['grp'][0] if a['grp'] else -1, a['subs'])
+            k_oop = ('oop', b['grp'][0] if b['grp'] else -1, b['subs'])
+            ip, oop = ROLE_FP.get(k_ip), ROLE_FP.get(k_oop)
             unknown += (ip is None) + (oop is None)
+            if dbg:
+                side = {0x20: ' rechts', 0x10: ' links'}.get(a['side'], '')
+                for kk, r, ph in ((k_ip, ip, 'mit Ball'), (k_oop, oop, 'gegen Ball')):
+                    print(f'  {a["pos"] + side:12} {ph:11} {r[2] if r else "UNBEKANNT":34} {kk!r}')
             d_ip, d_oop = ROLE_DEFAULT.get(a['pos'], ('cm', 'cm'))
             x, y = POS_XY[a['pos']]
             dx = SIDE_DX.get(a['pos'], 0)
             x += dx if a['side'] == 0x20 else -dx if a['side'] == 0x10 else 0
             slots.append([a['pos'], x, y, ip[0] if ip else d_ip, oop[0] if oop else d_oop,
                           ip[1] if ip else '?', oop[1] if oop else '?', b['pos']])
-        out.append(dict(name=name, active=m.group(1) == b'\x02', slots=slots, unknown=unknown))
+        out.append(dict(name=name, active=m.group(1) == b'\x02', slots=slots, unknown=unknown,
+                        style_name=style_name, style_code=style_code))
     return out
 
 
@@ -464,6 +510,9 @@ def est_value(ca, pa, age, years_left, lg_factor):
 def main():
     cfg_path = os.path.join(HERE, 'config.json')
     cfg = json.load(open(cfg_path, encoding='utf-8')) if os.path.exists(cfg_path) else {}
+    if len(sys.argv) > 1 and sys.argv[1] in ('--list', '-l'):
+        print_saves()
+        return
     save = find_save(sys.argv[1] if len(sys.argv) > 1 else cfg.get('save'))
     log('Spielstand:', save)
     frames, offs = read_frames(save)
@@ -659,7 +708,12 @@ def main():
         st = next((x for x in saved if x['active']), saved[0])
         tactic.update(name=st['name'], slots=st['slots'], source='Spielstand', unknown_roles=st['unknown'],
                       saved=list(dict.fromkeys(x['name'] for x in saved)))
-        log('Taktik aus Spielstand:', st['name'], '| unbekannte Rollen:', st['unknown'])
+        if st['style_name']:
+            tactic['style_name'] = st['style_name']
+            if st['style_code'] in STYLE_CODES:
+                tactic['style'] = STYLE_CODES[st['style_code']]
+        log('Taktik aus Spielstand:', st['name'], '| Stil:', st['style_name'], st['style_code'],
+            '| unbekannte Rollen:', st['unknown'])
     elif tactic.get('slots'):
         tactic['source'] = 'config.json'
         log('Keine eigene Taktik im Spielstand – nutze config.json')
