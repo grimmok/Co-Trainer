@@ -1,18 +1,18 @@
-# FM-Scout als eigenständiges Programm – Design
+# Co-Trainer (bisher „FM-Scout“) als eigenständiges Programm – Design
 
-Stand: 09.11.2026 · Grundlage: Gespräch mit dem Nutzer · Projektwissen: `HANDOFF.md`, `CLAUDE.md`
+Stand: 10.11.2026 (erstellt 09.11.) · Grundlage: Gespräch mit dem Nutzer · Projektwissen: `HANDOFF.md`, `CLAUDE.md`
 
 ## 1. Absicht und Warum
 
-FM-Scout liest einen Football-Manager-27-Spielstand und hilft, Kader, Taktik, Transfers und Training zu verbessern. Heute ist es ein Python-Skript (`extract.py`), das über eine Batch-Datei gestartet wird und eine 4-MB-HTML-Datei (`FM-Scout.html`) erzeugt, die dann im Browser geöffnet wird.
+Co-Trainer liest einen Football-Manager-27-Spielstand und hilft, Kader, Taktik, Transfers und Training zu verbessern. Heute ist es ein Python-Skript (`extract.py`), das über eine Batch-Datei gestartet wird und eine 4-MB-HTML-Datei (`FM-Scout.html`) erzeugt, die dann im Browser geöffnet wird.
 
 Der Nutzer will **ein einziges Programm**: Doppelklick, ein Fenster, fertig – keine Batch-Datei, keine erzeugte HTML-Seite, kein Python-Wissen nötig. Das Programm soll **öffentlich auf GitHub** liegen und von anderen FM-Spielern (z. B. aus einem Discord) benutzt werden.
 
-Ein zweiter, gleich wichtiger Grund: FM-Scout darf das **Spielerlebnis nicht ungewollt verändern**. Wer genaue Werte ungescouteter Spieler sieht, spielt ein anderes, leichteres Spiel. Deshalb ist alles, was über das im Spiel ohne Scouting Sichtbare hinausgeht, standardmäßig aus und nur bewusst, mit Hinweis, einschaltbar.
+Ein zweiter, gleich wichtiger Grund: Co-Trainer darf das **Spielerlebnis nicht ungewollt verändern**. Wer genaue Werte ungescouteter Spieler sieht, spielt ein anderes, leichteres Spiel. Deshalb ist alles, was über das im Spiel ohne Scouting Sichtbare hinausgeht, standardmäßig aus und nur bewusst, mit Hinweis, einschaltbar.
 
 ## 2. Ziele
 
-1. Ein Windows-Programm `FM-Scout.exe`, das ohne installiertes Python läuft und als Release auf GitHub verteilt wird.
+1. Ein Windows-Programm `Co-Trainer.exe`, das ohne installiertes Python läuft und als Release auf GitHub verteilt wird.
 2. Geführter Start: Spielstand-Ordner → letzten Spielstand bestätigen → Analyse wählen → Ergebnis.
 3. Sechs Bereiche, jederzeit einzeln ein- und ausblendbar: Kaderanalyse, Transfervorschläge, Taktik, Training, Kaderliste (plus „Alles“ als Startwahl).
 4. Transfervorschläge mit dreistufiger Informationstiefe (Aus / Scoutbericht / Werte), Standard „Aus“.
@@ -24,10 +24,9 @@ Ein zweiter, gleich wichtiger Grund: FM-Scout darf das **Spielerlebnis nicht ung
 
 - Keine englische Oberfläche (vorerst nur Deutsch, mit deutschen FM27-Begriffen).
 - Kein macOS/Linux (vorerst nur Windows).
-- Keine Bewertung „Infos zum nächsten Spiel“ (Gegnerbericht) – gehört nicht zu FM-Scout.
+- Keine Bewertung „Infos zum nächsten Spiel“ (Gegnerbericht) – gehört nicht zu Co-Trainer.
 - Kein Schreiben in Spielstände, kein Ändern von Spieldateien.
 - Keine Online-Funktionen: kein Upload, keine Telemetrie, kein Server.
-- Trainerbewertungen des menschlichen Managers (Offensive, Taktik, Torhüter …) werden **nicht** gelesen: Ein Testspielstand mit zwei Trainern unterschiedlicher Lizenz hat gezeigt, dass das Spiel sie sehr wahrscheinlich berechnet statt speichert.
 
 ## 4. Anti-Ziele (wäre ein Fehlschlag, auch wenn es technisch läuft)
 
@@ -75,7 +74,7 @@ Wie bisher: Spielfeld mit bester Elf zur Taktik, Rollen mit/gegen den Ball, Schw
 - **Sortierung in Stufe „Aus“** nach sichtbaren Kriterien: Position passt zu einer Schwachstelle, Alter, Vertragsende/ablösefrei, Wechselchance, Liga/Vereinsstärke. Nicht zufällig.
 - **Beim Wechsel auf eine höhere Stufe** erscheint ein Hinweis, dass dies das Spielerlebnis verändert bzw. vereinfacht, mit „Trotzdem einblenden“ / „Abbrechen“ und „Nicht mehr fragen“.
 - **Wichtig:** In Stufe „Aus“ darf auch indirekt nichts verraten werden – weder über die Reihenfolge noch über Texte, Farben oder Filter, die aus CA/PA oder Attributen abgeleitet sind.
-- **Vorauswahl über das Scoutinggebiet** (vom Nutzer so beschrieben): In FM27 stellt man ein Scoutinggebiet ein (Weltweit / Europa / Südeuropa / Italien – vermutlich Kontinent / Region / eigenes Land). Die Spielerdatenbank im Spiel zeigt dann automatisch die Spieler dieses Gebiets und lässt nach Wechselbereitschaft filtern. Was das Spiel so offen zeigt, darf FM-Scout auch zeigen: Die Transfervorschläge enthalten nur Spieler aus dem eingestellten Scoutinggebiet; die Wechselchance darf in Stufe „Aus“ erscheinen. Die bisherige Vorauswahl über CA/PA entfällt dadurch weitgehend.
+- **Vorauswahl über das Scoutinggebiet** (vom Nutzer so beschrieben): In FM27 stellt man ein Scoutinggebiet ein (sieben Stufen: Kein Scouting / Eigene Liga / Angrenzende Ligen / Eigenes Land / Region / Kontinent / Weltweit). Die Spielerdatenbank im Spiel zeigt dann automatisch die Spieler dieses Gebiets und lässt nach Wechselbereitschaft filtern. Was das Spiel so offen zeigt, darf Co-Trainer auch zeigen: Die Transfervorschläge enthalten nur Spieler aus dem eingestellten Scoutinggebiet; die Wechselchance darf in Stufe „Aus“ erscheinen. Die bisherige Vorauswahl über CA/PA entfällt dadurch weitgehend.
 - *(Annahme Claude)* Ein Schalter „Auch außerhalb meines Scoutinggebiets suchen“ ist eine weitere bewusste Abkürzung mit demselben Hinweis wie die Stufen.
 
 ### 7.3 Taktik (ersetzt „Trainer & Taktik“; vom Nutzer so festgelegt)
@@ -86,7 +85,8 @@ Ziel: **Wo sind die Schwachstellen meiner Taktik, und wer verursacht sie?** – 
 - Bei schwachen Bereichen: **wer** (Spieler + Position + verantwortliche Attribute mit Wert, eigener Kader) und **was hilft** (Rolle ändern, im Training fördern, Transfer).
 - Verknüpfung: Schwache Bereiche werden Fokus im Trainingsvorschlag und Suchkriterium bei Transfervorschlägen.
 - **Trainertendenzen** (z. B. „Spielt offensiven Fußball“, „Taktiktüftler“) fließen ein, weil FM27 sie bei der Spielerüberzeugung berücksichtigt; Hinweis, wenn Taktik und Tendenzen sich widersprechen. Herkunft siehe 8.3.
-- Kein Trainerprofil-Formular mehr; Trainerbewertungen entfallen.
+- **Trainerbewertungen** (Offensive, Defensive, Fitness, Torhüter, Ballbesitz, Standardsituationen, Taktik, Techniken, Nachwuchsarbeit sowie Anpassungsfähigkeit, Autorität, Zielstrebigkeit, Motivationsfähigkeit, Führungsqualitäten) bleiben im Taktik-Reiter *(vom Nutzer am 10.11. entschieden)*. Sie werden aus dem Spielstand gelesen und als Textstufe wie im Spiel gezeigt: Sehr schlecht (bis 6), Schlecht (7–9), Durchschnitt (10–11), Gut (12–15), Sehr gut (16–17), Herausragend (18–19), Elite (20). Schwache Bewertungen, die die gewählte Taktik braucht, erscheinen als Hinweis.
+- Kein Trainerprofil-Formular mehr: Der Nutzer tippt keine Bewertungen ein.
 
 ### 7.4 Training
 Wie bisher (Wochenplan mit echten FM27-Einheiten, Trainingsbewertungen, gespeicherte Wochenpläne), zusätzlich mit Fokus auf die schwachen Taktikbereiche aus 7.3.
@@ -103,20 +103,23 @@ Wie bisher.
 - fmsave braucht Python ≥ 3.12; das gebündelte Programm bringt es mit.
 
 ### 8.2 Was ersetzt `config.json`
-- Spielstand-Ordner, Spielinstallation, hell/dunkel, Informationsstufe, „Nicht mehr fragen“: Programmeinstellungen des Nutzers (z. B. in `%APPDATA%\FM-Scout`).
+- Spielstand-Ordner, Spielinstallation, hell/dunkel, Informationsstufe, „Nicht mehr fragen“: Programmeinstellungen des Nutzers (z. B. in `%APPDATA%\Co-Trainer`).
 - Pro Karriere: eigene Rollenwahl, Filter, gespeicherte Wochenpläne, Trainertendenzen (falls von Hand gesetzt).
 - `config.json` des Repos entfällt für Endnutzer.
 
 ### 8.3 Trainertendenzen
-Zuerst versuchen, sie aus dem Spielstand zu lesen. Gelingt das nicht, wählt der Nutzer sie einmal pro Karriere aus einer Liste (≈ 5 Klicks). Ohne Angabe entfällt nur der Tendenzen-Hinweis.
+Der Nutzer wählt sie einmal pro Karriere aus einer Liste (≈ 5 Klicks) *(vom Nutzer am 10.11. entschieden)*. Ohne Angabe entfällt nur der Tendenzen-Hinweis. Grund: Die 15 Neigungen sind zwar im Spielstand lesbar, stehen beim menschlichen Manager aber in allen geprüften Karrieren auf dem Startwert 10 und erklären die im Spiel angezeigten Tendenzen nicht.
 
-### 8.4 Bekannte Korrektur
-Persönlichkeitsreihenfolge ist Anpassung, Ehrgeiz, Loyalität, Druck, Professionalität, Sportsgeist, Temperament, Kontroversität (bisher falsch angenommen; `willingness()` las Druck statt Loyalität). Laut Regel vor Übernahme mit Screenshot des Nutzers abgleichen.
+### 8.4 Trainerbewertungen
+Aus dem Staff-Block des menschlichen Managers in `game_db` (`read_coach` in `extract.py`; Zuordnung per Ingame-Editor-Test und Screenshots für Ravenna und Paris bestätigt, siehe `HANDOFF.md`). Wird der Block nicht gefunden, entfällt der Abschnitt im Taktik-Reiter.
+
+### 8.5 Bekannte Korrektur
+Persönlichkeitsreihenfolge ist Anpassung, Ehrgeiz, Loyalität, Druck, Professionalität, Sportsgeist, Temperament, Kontroversität (bisher falsch angenommen; `willingness()` las Druck statt Loyalität). Am 10.11. mit Screenshot (Viola, „Professionell“) abgeglichen und in `willingness()` korrigiert.
 
 ## 9. Gestalt und Technik (Entscheidung von Claude, nicht vom Nutzer)
 
 - Ein natives Programmfenster, dessen Oberfläche mit Web-Technik gezeichnet wird (Windows-eigene Edge-WebView2), Python im Hintergrund – so lässt sich die vorhandene Oberfläche aus `app.html` weiterverwenden und modern gestalten.
-- Ausgeliefert als **eine** `FM-Scout.exe` (alles gebündelt), als GitHub-Release; Quellcode im Repo.
+- Ausgeliefert als **eine** `Co-Trainer.exe` (alles gebündelt), als GitHub-Release; Quellcode im Repo.
 - Keine erzeugte HTML-Datei auf der Festplatte, keine Batch-Datei.
 - Stil (vom Nutzer gewählt): **„Dunkel & neutral“** – fast schwarzer Hintergrund, Karten mit dezentem Rand, ein türkisgrüner Akzent, gelb/orange für Warnungen. Umschaltbar auf **„Hell & klar“** – weiß, grüne Akzente. Wahl wird gespeichert.
 - Lizenzhinweis für fmsave (MIT) im Programm und im Repo.
@@ -129,20 +132,22 @@ Persönlichkeitsreihenfolge ist Anpassung, Ehrgeiz, Loyalität, Druck, Professio
 - Ob das Einlesen im Hintergrund zwischengespeichert wird, um den zweiten Start zu beschleunigen.
 - Tests und Prüfungen, mit echtem Spielstand des Nutzers als Abnahme.
 
-### Entscheidungen von Claude (vom Nutzer noch nicht bestätigt)
+### Entscheidungen von Claude (vom Nutzer am 10.11. bestätigt)
 
 - **fmsave** wird als veröffentlichtes Paket in fester Version eingebunden (nicht der lokale Klon); Updates bewusst.
 - **`extract.py`** bleibt als Modul für die Leselogik erhalten; die alte Ausgabe als HTML-Datei und `FM-Scout starten.bat` entfallen.
 - Der bisherige Inhalt von „Trainer & Taktik“ (Rangliste der Spielstile nach Kaderpassung) wandert in den Taktik-Reiter als Vorschlag „Diese Spielstile passen besser zu deinem Kader“.
 - Die gewählte Informationsstufe der Transfervorschläge wird gespeichert und gilt beim nächsten Start weiter.
 - Die `.exe` ist anfangs **nicht signiert**; Windows zeigt beim ersten Start „Der Computer wurde durch Windows geschützt“. Die README erklärt, wie man trotzdem startet.
-- Lizenz des FM-Scout-Repos: **MIT** (wie fmsave). Kann der Nutzer ändern.
+- Lizenz des Co-Trainer-Repos: **MIT** (wie fmsave). Kann der Nutzer ändern.
 - Die Transferliste zeigt eine überschaubare Zahl an Vorschlägen (z. B. die besten 50 je Filter) statt Tausender Zeilen – gegen „unübersichtlich“.
 
 ## 11. Offene Punkte
 
-- **Scoutinggebiet auslesen:** In `scout_man` steht ein 4-Zeichen-Code, der sich mit dem Gebiet ändert: Italien = `AcSP`, Europa = `blcP` (Vergleich zweier Ravenna-Spielstände, sonst unverändert). Es fehlen die Codes für Weltweit und Südeuropa sowie die Bestätigung, dass „Italien“ allgemein „eigenes Land“ bedeutet. Außerdem nötig: Zuordnung Land → Region/Kontinent (vermutlich aus der Spieldatenbank).
+- **Scoutinggebiet:** Auslesen ist gelöst (10.11., siehe `HANDOFF.md`): sieben Stufen – Kein Scouting, Eigene Liga, Angrenzende Ligen, Eigenes Land, Region, Kontinent, Weltweit. „Angrenzende Ligen“ sind laut Nutzer die eigene Spielklasse plus je eine Stufe darüber und darunter (Ravenna: Serie B, Serie C, Serie D); dafür muss die Ligastufe noch aus dem Spielstand gelesen werden. Offen ist außerdem, und woran man im Spielstand erkennt, welche Spieler den Mitarbeitern bekannt sind: Bei „Kein Scouting“ zeigt das Spiel laut Nutzer nur diese. **Bei „Kein Scouting“ gibt es trotzdem Vorschläge** *(vom Nutzer am 10.11. entschieden)*: bevorzugt vertragslose Spieler mit der Nationalität des Landes, in dem der eigene Verein spielt. Dass darunter auch zu schwache Spieler sind, nimmt der Nutzer in Kauf. *(Auslegung Claude: „der Nation angehören“ = Nationalität des Vereinslandes; weitere Gruppen kommen erst dazu, wenn die Bekanntheit bei den Mitarbeitern lesbar ist.)*
+- **Ländernamen und Nationalität:** fmsave liefert je Spieler die Nation (spielstandinterne Nummer) und dazu die Datenbank-Nummer. Die deutschen Ländernamen mit Kürzel stehen in `lang_db.dat` (Frame 64, z. B. 776 = Italien/ITA, 769 = Frankreich/FRA). Die Nummern liegen grob nach Kontinent beieinander (Afrika 5–55, Asien 106–145, Nord-/Mittelamerika 359–389, Europa 752–802, Ozeanien 1435–1444, Südamerika 1649–1662), aber mit Ausreißern; als Zuordnung reicht das nicht. Kontinent und eine Regions-Nummer je Land stehen in der Nationentabelle des Spielstands (gefunden am 10.11., siehe `HANDOFF.md`); der Nutzer hat bestätigt, dass „Südeuropa“ genau Italiens Regionsgruppe ist (Italien, Malta, San Marino, Slowenien, Kroatien, Bosnien und Herzegowina, Albanien, Montenegro).
+- **Name des Programms: „Co-Trainer“** *(vom Nutzer am 10.11. gewählt)*. Der frühere Arbeitstitel „FM-Scout“ entfällt, weil „FM Scout“ eine große FM-Website ist. Ob der Name anderweitig vergeben ist, wurde nicht geprüft. Ordner, Repo und die bestehenden Dateien (`FM-Scout.html`, `FM-Scout starten.bat`) heißen bis zum Umbau weiter wie bisher.
 - Ob die Hintergrundrechnung in Stufe „Aus“ weiterhin CA/PA nutzen darf (z. B. damit nicht viel zu schwache Spieler oben stehen), ist mit dem Scoutinggebiet weniger dringend, aber nicht abschließend geklärt.
-- Das Design-Dokument ist **vom Nutzer noch nicht freigegeben**.
+- **Freigabe:** Der Nutzer hat das Design am 10.11.2026 freigegeben, einschließlich der „Entscheidungen von Claude“ in Abschnitt 10. Die übrigen Punkte dieses Abschnitts bleiben offen und werden beim Bau geklärt.
 - Teamanweisungen (16 Byte im Taktikkopf) sind nicht dekodiert; bis dahin zeigt der Taktik-Reiter keine Teamanweisungen.
 - Rollentest für weitere Rollen-Fingerabdrücke steht weiter aus (siehe `HANDOFF.md`).

@@ -456,6 +456,62 @@ def read_tactics(frames, names):
     return out
 
 
+# ---------------------------------------------------------------- Scoutinggebiet
+# Stufe im Abschnitt "humans": 33 00 <Stufe u8> <u32> 20 00 01 00 <Datum>.
+# Mit Spielständen des Nutzers abgeglichen (10.11.): Ravenna 1–7, Paris 2 und 4.
+SCOUT_AREAS = {1: 'Kein Scouting', 2: 'Eigene Liga', 3: 'Angrenzende Ligen', 4: 'Eigenes Land',
+               5: 'Region', 6: 'Kontinent', 7: 'Weltweit'}
+
+
+def read_scout_area(frames, names):
+    """Stufe des Scoutinggebiets (1–7) oder None, wenn nicht eindeutig gefunden."""
+    if 'humans' not in names:
+        return None
+    h = frames[names['humans']]
+    hits = {m.group(1)[0] for m in re.finditer(rb'\x33\x00([\x01-\x07])[\x00-\xff]{4}\x20\x00\x01\x00', h, re.S)}
+    return hits.pop() if len(hits) == 1 else None
+
+
+# ---------------------------------------------------------------- Trainer (menschlicher Manager)
+# Staff-Block vor dem Personenkopf: 0c, 26 Neigungen (1–20; Slot 13 ist 0–100), 26 Attribute (1–100), ff×4.
+# Zuordnung per Ingame-Editor-Test des Nutzers (10.11., "Trainertest 2 …") bestätigt.
+COACH_ATTR = {8: 'Offensive', 9: 'Defensive', 10: 'Fitness', 1: 'Torhüter', 11: 'Ballbesitz', 25: 'Standardsituationen',
+              13: 'Taktik', 12: 'Techniken'}                    # Index im Attributblock, Wert / 5
+COACH_MENTAL = {4: 'Führungsqualitäten', 5: 'Motivationsfähigkeit'}
+COACH_TEND = {0: 'Offensive', 1: 'Geschäftliches', 3: 'Vertikaler Stil', 6: 'Eingreifen', 9: 'Geduld',
+              10: 'Pressingauslösung', 11: 'Finanzmittel', 14: 'Spieler kaufen', 15: 'Psychologische Spielchen',
+              19: 'Defensivlinie', 21: 'Flexibilität', 22: 'Trainingsintensität', 23: 'Rotation', 24: 'Tempo', 25: 'Breite'}
+
+
+def coach_band(v):
+    """Textstufe wie im Trainerprofil. Grenzen aus den Profil-Screenshots des Nutzers (Ravenna, Paris)."""
+    # 18–19 = „Herausragend“, 20 = „Elite“ (beides vom Nutzer bestätigt)
+    return ('Sehr schlecht' if v <= 6 else 'Schlecht' if v <= 9 else 'Durchschnitt' if v <= 11
+            else 'Gut' if v <= 15 else 'Sehr gut' if v <= 17 else 'Herausragend' if v <= 19 else 'Elite')
+
+
+def read_coach(d, manager):
+    """Bewertungen (1–20) und Neigungen des menschlichen Managers aus game_db; None, wenn nicht eindeutig."""
+    name = manager.encode('utf-8')
+    hits = [m.start() for m in re.finditer(re.escape(name), d)]
+    if len(hits) != 1:
+        return None
+    p = hits[0]
+    for q in range(p - 300, max(p - 3000, 0), -1):
+        if d[q] != 12:
+            continue
+        pr, at = d[q + 1:q + 27], d[q + 27:q + 53]
+        if (all(1 <= v <= 20 for i, v in enumerate(pr) if i != 13) and all(1 <= v <= 100 for v in at)
+                and d[q + 53:q + 57] == b'\xff\xff\xff\xff'):
+            pers = d[p + len(name) + 22:p + len(name) + 30]
+            coaching = {n: round(at[i] / 5) for i, n in COACH_ATTR.items()}
+            coaching['Nachwuchsarbeit'] = pr[12]
+            mental = {n: round(at[i] / 5) for i, n in COACH_MENTAL.items()}
+            mental.update({'Anpassungsfähigkeit': pers[0], 'Autorität': pr[4], 'Zielstrebigkeit': round(pr[13] / 5)})
+            return dict(coaching=coaching, mental=mental, tendencies={n: pr[i] for i, n in COACH_TEND.items()})
+    return None
+
+
 # ---------------------------------------------------------------- Bewertungen (CA/PA bleiben intern)
 # (Schwelle, Nominativ, "zu ..."-Form)
 LEVELS = [(185, 'Weltklassespieler', 'zu einem Weltklassespieler'),
@@ -587,7 +643,7 @@ def main():
         for pl in players.values():
             if any(s in pl['name'] for s in os.environ['FMS_DEBUG'].split(',')):
                 print('DEBUG', pl['name'], pl['dob'], pl['club'], 'CA', pl['ca'], 'PA', pl['pa'], pl['pos'],
-                      [round(x / 5) for x in pl['attrs']])
+                      [round(x / 5) for x in pl['attrs']], 'Persönlichkeit (Rohbytes)', pl['pers'])
     rat, weeks = training(frames, names)
 
     # menschlicher Verein = Verein der meisten Spieler in der Trainingsbewertung
@@ -651,7 +707,8 @@ def main():
         if lvl_gap > 10:
             score -= (lvl_gap - 10) * 1.2
         p = pl['pers'] or [10] * 8
-        ambition, loyalty = p[1], p[3]
+        # Reihenfolge: Anpassung, Ehrgeiz, Loyalität, Druck, Professionalität, Sportsgeist, Temperament, Kontroversität
+        ambition, loyalty = p[1], p[2]
         if diff > 0:
             score -= (ambition - 10) * 1.5
         score -= (loyalty - 10) * 1.0
@@ -718,12 +775,27 @@ def main():
         tactic['source'] = 'config.json'
         log('Keine eigene Taktik im Spielstand – nutze config.json')
 
+    scout_area = read_scout_area(frames, names)
+    # Trainerprofil: Bewertungen aus dem Spielstand haben Vorrang vor config.json (als Textstufe wie im Spiel)
+    coach = dict(club_cfg.get('coach', {}))
+    coach_save = read_coach(db.d, manager)
+    if coach_save:
+        coach['coaching'] = {k: coach_band(v) for k, v in coach_save['coaching'].items()}
+        coach['mental'] = {k: coach_band(v) for k, v in coach_save['mental'].items()}
+        coach['source'] = 'Spielstand'
+        log('Trainer laut Spielstand:', coach_save['coaching'], coach_save['mental'])
+        log('Neigungen laut Spielstand:', coach_save['tendencies'])
+    else:
+        log('Trainerwerte im Spielstand nicht gefunden – nutze config.json')
+    log('Scoutinggebiet:', SCOUT_AREAS.get(scout_area, 'nicht gefunden'), scout_area or '')
+
     data = dict(
         meta=dict(manager=manager, date=game_date.isoformat(), club=my.get('name'), club_short=my.get('short'),
+                  scout_area=scout_area, scout_area_name=SCOUT_AREAS.get(scout_area),
                   league=my_league.get('name', ''), league_long=my_league.get('long', ''),
                   finances=fin, save=os.path.basename(save), created=datetime.datetime.now().isoformat(timespec='minutes'),
                   rivals=[club_map.get(t, {}).get('short', '') for t in my_league.get('teams', []) if t != my_id]),
-        coach=club_cfg.get('coach', {}), tactic=tactic,
+        coach=coach, tactic=tactic,
         squad=squad, pool=pool, training=dict(weeks=weeks),
     )
     tpl = open(os.path.join(HERE, 'app.html'), encoding='utf-8-sig').read()
