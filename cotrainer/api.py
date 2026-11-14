@@ -132,7 +132,10 @@ class Api:
         except Exception as e:                                  # die Meldung selbst könnte Werte enthalten
             self._call('onError', f'Unerwarteter Fehler beim Einlesen: {type(e).__name__}')
         else:
-            self._call('onResult', data)
+            try:
+                self._call('onResult', data)
+            except Exception as e:                              # sonst bliebe die Seite beim Fortschritt stehen
+                self._call('onError', f'Das Ergebnis konnte nicht angezeigt werden: {type(e).__name__}')
 
     def join(self, timeout=120):
         """Wartet auf das laufende Einlesen (für Tests)."""

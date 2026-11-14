@@ -29,7 +29,7 @@ Die Seite soll:
 | `cotrainer/api.py` | Brücke Oberfläche ↔ Python (Klasse `Api`). Das Einlesen läuft in einem Thread und meldet sich über `CT.onProgress`, `CT.onResult`, `CT.onError`. |
 | `cotrainer/app.py`, `cotrainer/__main__.py` | Fenster (pywebview, Edge WebView2). Start: `python -m cotrainer`. |
 | `cotrainer/ui/index.html` | Oberfläche (Vanilla JS): geführter Start in drei Schritten, Ergebnis mit ein-/ausblendbaren Bereichen, hell/dunkel. |
-| `tests/` | 51 Tests (pytest); fünf davon brauchen echte Spielstände (Marke `save`). |
+| `tests/` | 55 Tests (pytest); fünf davon brauchen echte Spielstände (Marke `save`). |
 | `build.ps1` | Führt die Tests aus und baut `dist\Co-Trainer.exe` (PyInstaller, eine Datei). |
 | `pyproject.toml` | Paketdaten und Abhängigkeiten (`zstandard`, `pywebview`; Entwicklung: `pytest`, `pyinstaller`). Python ≥ 3.12 in `.venv`. |
 | `config.json` | Nur noch Entwicklerhilfe für Kontrollläufe in der Konsole (Trainerprofil und Taktik pro Verein aus Screenshots). Das Programm benutzt sie nicht. |
@@ -91,6 +91,22 @@ Nutzerdaten:
       - Der Schlüssel im `localStorage` heißt jetzt `cotrainer:<Verein>|<Manager>`.
     - **Andere Spielstände am 14.11. gelesen wie im Programm (ohne `config.json`):** Paris FC läuft mit Standardformation (78 Spieler im Kader, Scouting „Kontinent“, Budget 4,99 Mio. €). Bei den **Nationaltrainer-Karrieren (Südkorea 2028, Curaçao) und dem Zwei-Manager-Spielstand `Trainertest .fm` findet der Leser keinen eigenen Kader.** Das Programm zeigt dann statt eines leeren Ergebnisses die Meldung „In diesem Spielstand wurde kein Kader des eigenen Vereins gefunden …“ (`require_squad`). Ob fmsave (Teil 2) diese Fälle löst, ist offen.
     - **Bekannte Grenzen von Teil 1:** Der Bereich „Trainer & Taktik“ hat noch den alten Inhalt (Teil 3 ersetzt ihn); Stil und Tendenzen des Trainers fehlen ohne `config.json`, dann entfallen die zugehörigen Zeilen. Transfervorschläge zeigen weiter die bisherige Informationstiefe (die drei Stufen kommen in Teil 2). Bei einem Spielstand ohne eigene Taktik (Paris) wird eine Standardformation 4-2-3-1 benutzt.
+
+16. **Durchsicht von Teil 1 und fmsave-Probe (14.11.):**
+    - **Unabhängige Durchsicht** (`/code-review high main...programm-entwurf`) ergab zehn Befunde. **Behoben** (55 Tests grün, Oberfläche im Entwicklermodus in Edge ohne Fenster durchgeklickt):
+      - „Neu einlesen“ las die Auswahl aus Schritt 2 statt des angezeigten Spielstands (jetzt `W.cur`; `W.run` = gerade eingelesen).
+      - Schritt 1: „Weiter“ konnte eine noch laufende Ordnerprüfung überholen; veraltete Antworten werden jetzt verworfen.
+      - `analyse()` meldete jeden `KeyError`/`IndexError` der Auswertung als „kein lesbarer FM27-Spielstand“. Jetzt gilt das nur noch für das Öffnen des Containers und die Pflichtabschnitte (`REQUIRED_SECTIONS`); Fehler danach erscheinen als „Unerwarteter Fehler beim Einlesen“.
+      - `assert_public` läuft jetzt in `analyse()` selbst, also auch beim Konsolenlauf mit `--dump`.
+      - `read_coach` mit leerem Managernamen durchsuchte die ganze Datenbank Byte für Byte.
+      - Schlug das Anzeigen des Ergebnisses fehl, blieb die Seite beim Fortschrittsbalken stehen; jetzt erscheint eine Meldung mit „Nochmal versuchen“.
+      - `read_summary`: der Rückfall auf die ganze Datei kopiert nicht mehr je Versuch und entpackt höchstens 16 MB je Kandidat.
+      - `render()` rechnete die beste Elf bis zu fünfmal je Klick; jetzt einmal je Durchlauf (`AN_MEMO`).
+    - **Offen gelassen:**
+      - `read_coach` ordnet den Staff-Block über die Nähe zum Namen zu, ohne ID-Prüfung (gleiche Schwäche wie früher bei den Spielerblöcken); Anpassungsfähigkeit wird ohne Bereichsprüfung 1–20 übernommen. Braucht die Dekodierung der Block-ID des Staff-Blocks.
+      - `app.main` zeigt die WebView2-Meldung bei jedem Startfehler. Außerdem nimmt pywebview bei belegtem Port 47127 keinen zufälligen, sondern den festen Port 42001 (Kommentar in `app.py` und Testname stimmen nicht).
+      - Schritt 1 speichert den Ordner schon bei der Prüfung (so gewollt, siehe Punkt 15).
+    - **fmsave 0.11.0 an fünf Spielständen probiert:** Ravenna 33 Spieler (27 erste Mannschaft, 6 zweites Team, 1 Leihe), Paris 79 (23 / 28 / 28). `team_slot == 0` ist die erste Mannschaft; damit ist der Kaderfilter gelöst. **Curaçao und Südkorea 2028 sind FM26-Spielstände** (26.3.1 und 26.3.2) und liefern `managed_clubs() == []`; Nationaltrainer löst fmsave also nicht. `Trainertest .fm` lässt sich weiter nicht öffnen. Dauer 19–34 s je Spielstand. `ManagedClub` liefert auch Kontostand und Scoutingbudget.
 
 ## Erkenntnisse zum Spielstand-Format
 
@@ -312,7 +328,7 @@ Stand 14.11.: **Teil 1 ist gebaut** (acht Tasks des Plans, Branch `programm-entw
    - ein Nationaltrainer-Spielstand (Südkorea 2028 oder Curaçao) → erwartet ist die Meldung „kein Kader des eigenen Vereins gefunden“ mit „Anderen Spielstand wählen…“;
    - Programm schließen und neu starten: Schritt 1 entfällt, Farbschema bleibt.
    - Windows zeigt beim ersten Start „Der Computer wurde durch Windows geschützt“, weil die `.exe` nicht signiert ist.
-2. **Unabhängige Durchsicht des Codes** (z. B. `/code-review`): Die Abschlussprüfung von Teil 1 hat Claude selbst gemacht, ohne zweiten Prüfer.
+2. ~~Unabhängige Durchsicht des Codes~~ erledigt am 14.11., siehe „Was bisher gemacht wurde“ Punkt 16. Die Korrekturen stecken noch nicht in `dist\Co-Trainer.exe`; vor dem Probelauf neu bauen (`.\build.ps1`).
 3. **Branch `programm-entwurf` nach `main` übernehmen**, wenn der Nutzer zufrieden ist (bisher nichts gepusht, kein PR).
 4. **Zurückgestellte Kleinigkeiten aus Teil 1** (nur auf Wunsch des Nutzers):
    - Rollenbeschriftungen auf dem Spielfeld überlappen bei benachbarten Spielern (war schon in der alten Seite so).
@@ -324,7 +340,7 @@ Stand 14.11.: **Teil 1 ist gebaut** (acht Tasks des Plans, Branch `programm-entw
    - Teil 2: fmsave als Datenquelle, Kader nur erste Mannschaft, Nationalität, Scoutinggebiet als Filter, drei Informationsstufen der Transfervorschläge.
    - Teil 3: neuer Taktik-Reiter (Schwachstellen, Verursacher, Abhilfe), Trainerbewertungen als Textstufen, Auswahl der Trainertendenzen pro Karriere, Trainingsfokus.
    - Teil 4: README, Lizenzhinweise, GitHub-Release.
-   - Für den Plan von Teil 2 zu klären: ob fmsave die Spielstände ohne gefundenen Kader löst (Nationaltrainer, zwei Manager) und wie fmsave (Python ≥ 3.12, feste Version) in die `.exe` gepackt wird.
+   - Für den Plan von Teil 2 geklärt (Punkt 16): fmsave löst weder Nationaltrainer noch zwei Manager; die Meldung `require_squad` und der eigene Leser als Rückfall bleiben. Noch zu klären: wie fmsave (Python ≥ 3.12, feste Version) in die `.exe` gepackt wird.
 6. **Für Teil 2 noch zu dekodieren:**
    - Ligastufe je Wettbewerb (für „Angrenzende Ligen“ = eigene Spielklasse ± 1 im selben Land).
    - Die 56 Länder ohne deutschen Namen (Regex für `lang_db.dat`, Frame 64, ist zu eng).

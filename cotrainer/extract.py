@@ -499,7 +499,9 @@ def coach_band(v):
 def read_coach(d, manager):
     """Bewertungen (1–20) und Neigungen des menschlichen Managers aus game_db; None, wenn nicht eindeutig."""
     name = manager.encode('utf-8')
-    hits = [m.start() for m in re.finditer(re.escape(name), d)]
+    if not name:                        # ein leeres Muster träfe an jedem Byte der Datenbank
+        return None
+    hits =[m.start() for m in re.finditer(re.escape(name), d)]
     if len(hits) != 1:
         return None
     p = hits[0]
@@ -611,17 +613,27 @@ def analyse(save_path, cfg=None, progress=None):
     """Liest den Spielstand und liefert die Daten für die Oberfläche (ohne CA, PA und versteckte Werte).
 
     progress erhält nacheinander die Texte aus PROGRESS_STEPS. Unlesbare Dateien ergeben SaveReadError."""
+    cfg, progress = cfg or {}, progress or (lambda text: None)
+    progress(PROGRESS_STEPS[0])
+    log('Spielstand:', save_path)
+    # Nur das Öffnen des Containers gilt als „unlesbare Datei“. Fehler in der Auswertung danach sind Programmfehler
+    # und dürfen nicht als kaputter Spielstand gemeldet werden.
     try:
-        return _analyse(save_path, cfg or {}, progress or (lambda text: None))
+        frames, offs = read_frames(save_path)
+        names = directory(frames, offs)
+        for section in REQUIRED_SECTIONS:
+            frames[names[section]]
     except (OSError, zstandard.ZstdError, KeyError, IndexError, struct.error) as e:
         raise SaveReadError(f'Das ist kein lesbarer FM27-Spielstand: {os.path.basename(save_path)}') from e
+    data = _analyse(save_path, frames, names, cfg, progress)
+    from . import guard                 # hier, weil guard dieses Modul einbindet
+    return guard.assert_public(data)
 
 
-def _analyse(save, cfg, progress):
-    progress(PROGRESS_STEPS[0])
-    log('Spielstand:', save)
-    frames, offs = read_frames(save)
-    names = directory(frames, offs)
+REQUIRED_SECTIONS = ('game_db', 'save_game_summary', 'training_man')
+
+
+def _analyse(save, frames, names, cfg, progress):
     db = DB(frames[names['game_db']])
     log('Datenbank', len(db.d) // 1_000_000, 'MB')
 

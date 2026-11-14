@@ -115,3 +115,14 @@ def test_set_title_changes_the_window_title(api):
     api._window.set_title = lambda t: api._window.calls.append("title:" + t)
     assert api.set_title("Co-Trainer · Ravenna · Serie C/B") == {"ok": True}
     assert api._window.calls[-1] == "title:Co-Trainer · Ravenna · Serie C/B"
+
+
+def test_failed_result_delivery_reports_error_instead_of_hanging(api, monkeypatch):
+    monkeypatch.setattr(extract, "analyse", lambda p, cfg=None, progress=None: {"squad": [], "pool": []})
+    real = api._window.evaluate_js
+    def flaky(js):
+        if js.startswith("CT.onResult("): raise RuntimeError("Fenster")
+        real(js)
+    api._window.evaluate_js = flaky
+    api.analyse("x.fm"); api.join()
+    assert api._window.calls[-1] == 'CT.onError("Das Ergebnis konnte nicht angezeigt werden: RuntimeError")'

@@ -59,3 +59,27 @@ def test_two_manager_save_reports_missing_squad(ravenna_save):
         pytest.skip("Trainertest .fm fehlt")
     with pytest.raises(extract.SaveReadError, match="kein Kader des eigenen Vereins"):
         extract.analyse(path)
+
+
+def test_coach_with_empty_manager_name_is_not_searched():
+    assert extract.read_coach(b"\x00" * 5000, "") is None
+
+
+def _readable(monkeypatch, result):
+    monkeypatch.setattr(extract, "read_frames", lambda p: ([b""], [0]))
+    monkeypatch.setattr(extract, "directory", lambda f, o: {s: 0 for s in extract.REQUIRED_SECTIONS})
+    monkeypatch.setattr(extract, "_analyse", result)
+
+
+def test_error_in_analysis_is_not_reported_as_unreadable_save(monkeypatch):
+    def broken(*a): raise KeyError("rolle")
+    _readable(monkeypatch, broken)
+    with pytest.raises(KeyError):
+        extract.analyse("x.fm")
+
+
+def test_every_result_passes_the_guard(monkeypatch):
+    from cotrainer.guard import HiddenValueError
+    _readable(monkeypatch, lambda *a: {"squad": [{"ca": 150}]})
+    with pytest.raises(HiddenValueError):
+        extract.analyse("x.fm")

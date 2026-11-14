@@ -15,6 +15,7 @@ from . import extract
 
 SKIP_SAVE = re.compile(r'backup|auto ?save', re.I)      # Sicherungen des Spiels
 TAIL_BYTES = 4 * 1024 * 1024                            # das Inhaltsverzeichnis steht am Dateiende
+TOC_MAX_BYTES = 16 * 1024 * 1024                        # mehr wird von einem Kandidaten nicht entpackt
 
 
 @dataclass
@@ -52,10 +53,11 @@ def default_saves_dir():
 
 def _last_frame(data):
     """Entpackt den letzten zstd-Frame in data, der das Inhaltsverzeichnis enthält; None, wenn keiner passt."""
+    view = memoryview(data)             # keine Kopie je Versuch; das Verzeichnis ist klein, also Ausgabe begrenzen
     pos = data.rfind(extract.MAGIC)
     while pos != -1:
         try:
-            raw = zstandard.ZstdDecompressor().decompressobj().decompress(data[pos:])
+            raw = zstandard.ZstdDecompressor().stream_reader(view[pos:]).read(TOC_MAX_BYTES)
         except zstandard.ZstdError:
             raw = b''
         if b'save_game_summary' in raw:
