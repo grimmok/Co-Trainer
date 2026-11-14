@@ -599,6 +599,13 @@ def default_tactic():
     return dict(name='Standard 4-2-3-1', slots=slots, source='Standard')
 
 
+def require_squad(squad, save_name):
+    """Ohne eigenen Kader gibt es nichts zu analysieren – lieber eine klare Meldung als ein leeres Ergebnis."""
+    if not squad:
+        raise SaveReadError('In diesem Spielstand wurde kein Kader des eigenen Vereins gefunden. Nationalmannschaften '
+                            f'und manche ältere Spielstände werden noch nicht unterstützt: {save_name}')
+
+
 # ---------------------------------------------------------------- Analyse
 def analyse(save_path, cfg=None, progress=None):
     """Liest den Spielstand und liefert die Daten für die Oberfläche (ohne CA, PA und versteckte Werte).
@@ -793,6 +800,7 @@ def _analyse(save, cfg, progress):
         return r
 
     squad = [out_player(pl, True) for pl in players.values() if pl['club'] == my_id]
+    require_squad(squad, os.path.basename(save))
     # Pool: Spieler, die für das eigene Niveau realistisch interessant sind
     lo, hi = my_str - 15, my_str + 35
     cand = [pl for pl in players.values() if pl['club'] != my_id and 16 <= age_of(pl['dob']) <= 35

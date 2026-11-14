@@ -19,7 +19,7 @@ Windows-Programm, das einen Football-Manager-27-Spielstand (`.fm`) liest und Kad
 
 - **Umgebung:** Python 3.12 in `.venv` (installiert ist sonst 3.10): `python -m uv venv --python 3.12 .venv`, dann `python -m uv pip install --python .venv -e ".[dev]"`.
 - **Programm starten:** `.venv\Scripts\python -m cotrainer`.
-- **Tests:** `.venv\Scripts\python -m pytest tests -q`. Die vier Tests mit echtem Spielstand (Marke `save`) dauern rund drei Minuten; ohne sie: `-m "not save"`. Der Testspielstand ist `Haribaert Kachinski – Ravenna.fm` (anderer Pfad über `COTRAINER_TEST_SAVE`).
+- **Tests:** `.venv\Scripts\python -m pytest tests -q`. Die fünf Tests mit echten Spielständen (Marke `save`) dauern rund drei Minuten; ohne sie: `-m "not save"`. Der Testspielstand ist `Haribaert Kachinski – Ravenna.fm` (anderer Pfad über `COTRAINER_TEST_SAVE`).
 - **`.exe` bauen:** `.\build.ps1` → `dist\Co-Trainer.exe`.
 - **Kontrolllauf in der Konsole:** `.venv\Scripts\python -m cotrainer.extract [Pfad.fm | Nummer]`, `--list` zeigt die Spielstände mit Nummer, `--dump Datei.json` schreibt das Ergebnis. Zum Prüfen einzelner Spieler die Umgebungsvariable `FMS_DEBUG=Name1,Name2` setzen. Dann werden Rohwerte inkl. CA/PA in die Konsole geschrieben; diese Werte nur zur Kontrolle verwenden, nie in die Oberfläche übernehmen. `FMS_ROLES=1` gibt die Rollen-Fingerabdrücke aus.
 - **Oberfläche:** `cotrainer/ui/index.html` (Vanilla JS). Änderungen an der Oberfläche immer dort vornehmen. Python und Oberfläche reden über `cotrainer/api.py` (Methoden der Klasse `Api`) und das JS-Objekt `CT`.

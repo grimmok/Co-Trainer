@@ -29,7 +29,7 @@ Die Seite soll:
 | `cotrainer/api.py` | Brücke Oberfläche ↔ Python (Klasse `Api`). Das Einlesen läuft in einem Thread und meldet sich über `CT.onProgress`, `CT.onResult`, `CT.onError`. |
 | `cotrainer/app.py`, `cotrainer/__main__.py` | Fenster (pywebview, Edge WebView2). Start: `python -m cotrainer`. |
 | `cotrainer/ui/index.html` | Oberfläche (Vanilla JS): geführter Start in drei Schritten, Ergebnis mit ein-/ausblendbaren Bereichen, hell/dunkel. |
-| `tests/` | 49 Tests (pytest); vier davon brauchen den Ravenna-Spielstand (Marke `save`). |
+| `tests/` | 51 Tests (pytest); fünf davon brauchen echte Spielstände (Marke `save`). |
 | `build.ps1` | Führt die Tests aus und baut `dist\Co-Trainer.exe` (PyInstaller, eine Datei). |
 | `pyproject.toml` | Paketdaten und Abhängigkeiten (`zstandard`, `pywebview`; Entwicklung: `pytest`, `pyinstaller`). Python ≥ 3.12 in `.venv`. |
 | `config.json` | Nur noch Entwicklerhilfe für Kontrollläufe in der Konsole (Trainerprofil und Taktik pro Verein aus Screenshots). Das Programm benutzt sie nicht. |
@@ -89,6 +89,7 @@ Nutzerdaten:
       - Fehlt WebView2, würde pywebview still auf den Internet Explorer ausweichen. `app.py` prüft deshalb vorher die Registry und zeigt sonst ein Meldungsfenster.
       - Schritt 1 merkt sich einen gültigen Ordner schon bei der Rückmeldung „✓ Ordner gefunden“, nicht erst bei „Weiter“.
       - Der Schlüssel im `localStorage` heißt jetzt `cotrainer:<Verein>|<Manager>`.
+    - **Andere Spielstände am 14.11. gelesen wie im Programm (ohne `config.json`):** Paris FC läuft mit Standardformation (78 Spieler im Kader, Scouting „Kontinent“, Budget 4,99 Mio. €). Bei den **Nationaltrainer-Karrieren (Südkorea 2028, Curaçao) und dem Zwei-Manager-Spielstand `Trainertest .fm` findet der Leser keinen eigenen Kader.** Das Programm zeigt dann statt eines leeren Ergebnisses die Meldung „In diesem Spielstand wurde kein Kader des eigenen Vereins gefunden …“ (`require_squad`). Ob fmsave (Teil 2) diese Fälle löst, ist offen.
     - **Bekannte Grenzen von Teil 1:** Der Bereich „Trainer & Taktik“ hat noch den alten Inhalt (Teil 3 ersetzt ihn); Stil und Tendenzen des Trainers fehlen ohne `config.json`, dann entfallen die zugehörigen Zeilen. Transfervorschläge zeigen weiter die bisherige Informationstiefe (die drei Stufen kommen in Teil 2). Bei einem Spielstand ohne eigene Taktik (Paris) wird eine Standardformation 4-2-3-1 benutzt.
 
 ## Erkenntnisse zum Spielstand-Format

@@ -42,3 +42,20 @@ def test_save_is_opened_read_only(monkeypatch, tmp_path):
     with pytest.raises(extract.SaveReadError):
         extract.analyse(str(f))
     assert all("w" not in m and "a" not in m and "+" not in m for p, m in modes if p.endswith(".fm"))
+
+
+def test_result_without_own_squad_is_a_clear_error():
+    # z. B. Nationaltrainer oder Spielstand mit zwei Managern: der Leser findet keinen eigenen Kader
+    with pytest.raises(extract.SaveReadError, match="kein Kader des eigenen Vereins"):
+        extract.require_squad([], "Südkorea.fm")
+    assert extract.require_squad([{"id": 1}], "x.fm") is None
+
+
+@pytest.mark.save
+def test_two_manager_save_reports_missing_squad(ravenna_save):
+    import os
+    path = os.path.join(os.path.dirname(ravenna_save), "Trainertest .fm")
+    if not os.path.isfile(path):
+        pytest.skip("Trainertest .fm fehlt")
+    with pytest.raises(extract.SaveReadError, match="kein Kader des eigenen Vereins"):
+        extract.analyse(path)
