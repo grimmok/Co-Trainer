@@ -1,10 +1,10 @@
-# FM-Scout – Übergabe
+# Co-Trainer (früher „FM-Scout“) – Übergabe
 
-Stand: 10.11.2026
+Stand: 14.11.2026
 
 ## Ziel
 
-Ein eigenes Programm, das einen **Football-Manager-27-Spielstand (`.fm`)** liest und daraus eine Analyse-Seite (`FM-Scout.html`) erzeugt. Vorbild ist die Seite `FM27 Transfer-Scout.html` des Nutzers (liegt in seinem Downloads-Ordner).
+Ein eigenes Windows-Programm (`Co-Trainer.exe`), das einen **Football-Manager-27-Spielstand (`.fm`)** liest und in einem Fenster analysiert. Vorbild ist die Seite `FM27 Transfer-Scout.html` des Nutzers (liegt in seinem Downloads-Ordner).
 
 Die Seite soll:
 
@@ -16,19 +16,27 @@ Die Seite soll:
 
 **Harte Vorgabe des Nutzers:** CA, PA und versteckte Attribute dürfen in der Oberfläche nie erscheinen. Das Potenzial wird nur als Text gezeigt, z. B. „Kann sich zu einem guten Zweitliga-Spieler entwickeln“.
 
-**Neue Richtung (09.11.):** FM-Scout wird zu **einem eigenständigen Windows-Programm** (`FM-Scout.exe`, ohne Batch-Datei, ohne erzeugte HTML-Seite), das öffentlich auf GitHub geteilt wird. Der vollständige Entwurf steht in [docs/superpowers/specs/2026-11-09-fm-scout-app-design.md](docs/superpowers/specs/2026-11-09-fm-scout-app-design.md). **Vom Nutzer am 10.11. freigegeben.** Das Programm heißt künftig „Co-Trainer“. Nächster Schritt: Umsetzungsplan.
+**Neue Richtung (09.11.):** FM-Scout wird zu **einem eigenständigen Windows-Programm** (`FM-Scout.exe`, ohne Batch-Datei, ohne erzeugte HTML-Seite), das öffentlich auf GitHub geteilt wird. Der vollständige Entwurf steht in [docs/superpowers/specs/2026-11-09-fm-scout-app-design.md](docs/superpowers/specs/2026-11-09-fm-scout-app-design.md). **Vom Nutzer am 10.11. freigegeben.** Das Programm heißt „Co-Trainer“. **Teil 1 (Grundgerüst) ist seit 14.11. gebaut**, siehe „Was bisher gemacht wurde“ Punkt 15 und „Nächste Schritte“.
 
 ## Dateien
 
 | Datei | Zweck |
 |---|---|
-| `extract.py` | Liest den Spielstand und schreibt `FM-Scout.html`. Aufruf: `python extract.py [Pfad.fm]`. Ohne Pfad wird der neueste `.fm` genommen. |
-| `app.html` | Vorlage der Oberfläche (Vanilla JS). `extract.py` ersetzt darin `/*__DATA__*/null` durch die Daten als JSON. |
-| `config.json` | Pro Verein (`clubs` → Kurzname oder Name): Trainerprofil (`coach`) und Taktik (`tactic`: Anweisungen, Feedback, Ersatz-Slots). `save` erzwingt einen bestimmten Spielstand, `lang_db` den Pfad zur Sprachdatenbank. |
-| `FM-Scout starten.bat` | Installiert bei Bedarf `zstandard`, startet `extract.py` und öffnet die Seite. |
-| `FM-Scout.html` | Erzeugte Ausgabe (ca. 4,4 MB). Wird bei jedem Lauf überschrieben. |
+| `cotrainer/extract.py` | Leselogik. `analyse(Pfad, cfg=None, progress=None)` liefert das Wörterbuch `meta`, `coach`, `tactic`, `squad`, `pool`, `training`. Unlesbare Dateien ergeben `SaveReadError`. Konsolenaufruf: `python -m cotrainer.extract [Pfad.fm \| Nummer] [--list] [--dump Datei.json]`. |
+| `cotrainer/guard.py` | `assert_public(data)`: Schutz gegen versteckte Werte (CA, PA, Persönlichkeit, versteckte Attribute, Zahlen bei Trainerbewertungen). Jedes Ergebnis geht hier durch, bevor es die Oberfläche erreicht. |
+| `cotrainer/saves.py` | Spielstand-Ordner finden, Spielstände auflisten (ohne Sicherungen), Kurzinfo (`read_summary`: Manager, Verein, Spieldatum) in Millisekunden lesen. |
+| `cotrainer/settings.py` | Programmeinstellungen in `%APPDATA%\Co-Trainer\settings.json`. |
+| `cotrainer/api.py` | Brücke Oberfläche ↔ Python (Klasse `Api`). Das Einlesen läuft in einem Thread und meldet sich über `CT.onProgress`, `CT.onResult`, `CT.onError`. |
+| `cotrainer/app.py`, `cotrainer/__main__.py` | Fenster (pywebview, Edge WebView2). Start: `python -m cotrainer`. |
+| `cotrainer/ui/index.html` | Oberfläche (Vanilla JS): geführter Start in drei Schritten, Ergebnis mit ein-/ausblendbaren Bereichen, hell/dunkel. |
+| `tests/` | 49 Tests (pytest); vier davon brauchen den Ravenna-Spielstand (Marke `save`). |
+| `build.ps1` | Führt die Tests aus und baut `dist\Co-Trainer.exe` (PyInstaller, eine Datei). |
+| `pyproject.toml` | Paketdaten und Abhängigkeiten (`zstandard`, `pywebview`; Entwicklung: `pytest`, `pyinstaller`). Python ≥ 3.12 in `.venv`. |
+| `config.json` | Nur noch Entwicklerhilfe für Kontrollläufe in der Konsole (Trainerprofil und Taktik pro Verein aus Screenshots). Das Programm benutzt sie nicht. |
 | `docs/superpowers/specs/2026-11-09-fm-scout-app-design.md` | Freigegebenes Design für das Programm „Co-Trainer“. |
-| `docs/superpowers/plans/2026-11-10-co-trainer-1-grundgeruest.md` | Umsetzungsplan Teil 1 (Grundgerüst), noch nicht ausgeführt. |
+| `docs/superpowers/plans/2026-11-10-co-trainer-1-grundgeruest.md` | Umsetzungsplan Teil 1 (Grundgerüst), am 14.11. ausgeführt. |
+
+Entfallen sind `extract.py` (Wurzel), `app.html`, `FM-Scout starten.bat` und die erzeugte `FM-Scout.html`.
 
 Die Dateien `Ravenna_Kader.*` und `Ravenna_Training.*` im übergeordneten Ordner sind frühe Einzelexporte. **`Ravenna_Kader` enthält falsch zugeordnete Attribute**, siehe Abschnitt „Erkenntnisse“.
 
@@ -46,7 +54,7 @@ Nutzerdaten:
 ## Was bisher gemacht wurde
 
 1. Das Containerformat entschlüsselt und Kader, Attribute, Verträge, Vereine, Finanzen, Ligen und Training ausgelesen.
-2. `extract.py`, `app.html` und `config.json` gebaut. Die Oberfläche hat fünf Reiter:
+2. `extract.py`, `app.html` und `config.json` gebaut (heute `cotrainer/extract.py` und `cotrainer/ui/index.html`). Die Oberfläche hat fünf Bereiche:
    - **Kader-Analyse:** Spielfeld mit beste Elf und Schwachstellen
    - **Transfervorschläge:** Filter nach Position, Alter, Wechselchance, Budget und ablösefrei
    - **Trainer & Taktik:** Passung Trainer ↔ Taktik, Rangliste der Spielstile, Prüfung der Teamanweisungen
@@ -57,20 +65,31 @@ Nutzerdaten:
    - Paris: Transferbudget 4,99 Mio. €, Gehaltsbudget 719.189 €/Woche, Kontostand 80,07 Mio. €
 4. Verträge mit Screenshots abgeglichen (Soleri, Spini, Tenkorang, Maggio).
 5. Trainerprofil und Taktik für Paris aus Screenshots in `config.json` übernommen. Der Nutzer hat das Profil „Offensiv/Entwickler“ gewählt.
-6. **Taktik aus dem Spielstand:** Positionen und Rollen werden jetzt aus `tactics_man` gelesen (`read_tactics` in `extract.py`). Beim Ravenna-Spielstand werden alle 22 Rollen erkannt. Neu in der Oberfläche:
+6. **Taktik aus dem Spielstand:** Positionen und Rollen werden jetzt aus `tactics_man` gelesen (`read_tactics` in `cotrainer/extract.py`). Beim Ravenna-Spielstand werden alle 22 Rollen erkannt. Neu in der Oberfläche:
    - die Rolle gegen den Ball und die Position ohne Ball werden auf dem Spielfeld angezeigt;
    - Rolle `cfo` (Mittelstürmer gegen den Ball);
    - FM27-Rollennamen;
    - Schlüsselattribute des Halbraumstürmers laut Screenshot.
 7. Eine kurze Vorstellung des Programms für einen FM-Discord-Mod-Kanal geschrieben (nur im Chat).
-8. **Spielstandwahl (09.11.):** `find_save` lässt Sicherungen (`backup`, `autosave`) aus. `python extract.py --list` zeigt alle Spielstände mit Nummer; `python extract.py 2` nimmt Nummer 2.
+8. **Spielstandwahl (09.11.):** `find_save` lässt Sicherungen (`backup`, `autosave`) aus. `python -m cotrainer.extract --list` zeigt alle Spielstände mit Nummer; `python -m cotrainer.extract 2` nimmt Nummer 2.
 9. **Rollentest-Hilfe (09.11.):** `FMS_ROLES=1` gibt für jede Taktik alle 22 Fingerabdrücke aus, unbekannte als `UNBEKANNT`. Die Schlüssel lassen sich direkt in `ROLE_FP` kopieren.
-10. **Spielstil aus dem Taktikkopf (09.11.):** Stilname und 4-Zeichen-Code werden gelesen (`STYLE_CODES` in `extract.py`: `TREV` → `vertical_tikitaka`, `EGEG` → `gegenpress`) und haben Vorrang vor `config.json`. Die Oberfläche übernimmt den Stil, sobald er sich im Spielstand ändert (`styleSeen` im `localStorage`).
+10. **Spielstil aus dem Taktikkopf (09.11.):** Stilname und 4-Zeichen-Code werden gelesen (`STYLE_CODES` in `cotrainer/extract.py`: `TREV` → `vertical_tikitaka`, `EGEG` → `gegenpress`) und haben Vorrang vor `config.json`. Die Oberfläche übernimmt den Stil, sobald er sich im Spielstand ändert (`styleSeen` im `localStorage`).
     - Ravenna: aktive Taktik „Taktik“ = **Gegenpressing**, „4-1-1-3-1 DM Breit – Vertikales Tiki-Taka“ = Vertikales Tiki-Taka. Gegenpressing für „Taktik“ hat der Nutzer am 10.11. bestätigt; damit gilt der Code `EGEG` als geprüft. `TREV` ist noch unbestätigt.
 11. **fmsave getestet (09.11.):** siehe Abschnitt „Abgleich mit fmsave“.
 12. **Brainstorming zum Umbau als Programm (09.11.):** Ablauf, Bereiche, Transfer-Informationsstufen, neuer Taktik-Reiter, Stil (dunkel/hell) mit dem Nutzer festgelegt → Design-Dokument (siehe oben). Entwürfe als HTML in `.superpowers/brainstorm/` (lokal, nicht im Repo): `ablauf-v2.html`, `transfer-werte.html`, `stil-v2.html`.
 13. **Trainerbewertungen und Neigungen gefunden (10.11.):** per Editor-Test, siehe „Trainer des menschlichen Managers“. Die Aussage vom 09.11. („werden berechnet“) ist widerlegt.
 14. **Scoutinggebiet dekodiert (10.11.):** siehe „Scoutinggebiet“.
+15. **Teil 1 des Umbaus gebaut (14.11.): Programm „Co-Trainer“.** Paket `cotrainer`, Fenster mit geführtem Start, `Co-Trainer.exe`.
+    - **Ablauf:** Schritt 1 Spielstand-Ordner (nur beim ersten Start, Vorschlag aus `Dokumente\Sports Interactive\Football Manager*\games`), Schritt 2 neuesten Spielstand bestätigen oder anderen wählen (mit Verein und Spieldatum), Schritt 3 Analyse wählen, dann Einlesen mit sechs Fortschrittstexten und das Ergebnis. Links „Anzeigen“ mit fünf Häkchen, darunter „Spielstand wechseln…“, „Neu einlesen“, „Hell/Dunkel“, „Ordner ändern…“.
+    - **Geprüft mit dem Ravenna-Spielstand im echten Fenster:** Einlesen 68 s, fünf Bereiche, Fenstertitel „Co-Trainer · Ravenna · Serie C/B“, keine versteckten Werte in den Daten, Änderungsdatum aller `.fm`-Dateien unverändert. Nach einem Neustart sind Ordner, Farbschema und angehakte Bereiche erhalten.
+    - **`Co-Trainer.exe`:** 12,1 MB, Fenster nach rund 2 s, legt neben sich keine Datei an. Aus der `.exe` heraus geprüft sind Start, Einstellungen und die Kurzinfo in Schritt 2; **das vollständige Einlesen aus der `.exe` hat noch niemand durchgeklickt** (derselbe Code läuft über `python -m cotrainer`).
+    - **Abweichungen vom Plan, die man kennen muss:**
+      - Das Fenster steht in `Api._window` (nicht `Api.window`), weil pywebview jedes öffentliche Attribut der `Api` für die Oberfläche offenlegt.
+      - pywebview liefert die Oberfläche über einen eingebauten HTTP-Server aus. Damit `localStorage` (Rollenwahl, Filter, sichtbare Bereiche je Karriere) zwischen Starts erhalten bleibt, ist der Port fest: `UI_PORT = 47127` in `app.py`. Ist er belegt, nimmt das Programm einen zufälligen Port und vergisst diesen Zustand für den Lauf.
+      - Fehlt WebView2, würde pywebview still auf den Internet Explorer ausweichen. `app.py` prüft deshalb vorher die Registry und zeigt sonst ein Meldungsfenster.
+      - Schritt 1 merkt sich einen gültigen Ordner schon bei der Rückmeldung „✓ Ordner gefunden“, nicht erst bei „Weiter“.
+      - Der Schlüssel im `localStorage` heißt jetzt `cotrainer:<Verein>|<Manager>`.
+    - **Bekannte Grenzen von Teil 1:** Der Bereich „Trainer & Taktik“ hat noch den alten Inhalt (Teil 3 ersetzt ihn); Stil und Tendenzen des Trainers fehlen ohne `config.json`, dann entfallen die zugehörigen Zeilen. Transfervorschläge zeigen weiter die bisherige Informationstiefe (die drei Stufen kommen in Teil 2). Bei einem Spielstand ohne eigene Taktik (Paris) wird eine Standardformation 4-2-3-1 benutzt.
 
 ## Erkenntnisse zum Spielstand-Format
 
@@ -92,7 +111,7 @@ FM speichert Geld in **GBP**. Für die Anzeige gilt: **EUR = GBP × 1,1641** (ex
 
 - Aufbau: 15 Positionsbytes (Werte 1–20), danach 54 Attribute (Werte 1–100; Anzeigewert = Wert / 5, gerundet).
 - Positionsreihenfolge: GK SW DL DC DR DM ML MC MR AML AMC AMR ST WBL WBR.
-- Attributreihenfolge: siehe `ATTR_KEYS` in `extract.py`. Versteckt sind: Cons, Dirt, ImpM, InjPr, Vers.
+- Attributreihenfolge: siehe `ATTR_KEYS` in `cotrainer/extract.py`. Versteckt sind: Cons, Dirt, ImpM, InjPr, Vers.
 - Präfix vor dem Block:
   - u32 bei −43 = **Personen-ID − 1**
   - CA (u16) bei −24
@@ -145,7 +164,7 @@ Danach folgen **22 Slot-Einträge**, abwechselnd mit Ball und gegen den Ball:
 
 - Positions-Bits: GK 1, SW 2, DR 4, DL 8, DC 10, WBR 20, WBL 40, DM 80, MR 100, ML 200, MC 400, AMR 800, AML 1000, AMC 2000, ST 4000.
 - Seite: 0x20 = rechts, 0x10 = links.
-- Die Rolle wird über einen Fingerabdruck erkannt: (Phase, Gruppen-Bit, Bitlisten der Unterblöcke) → Tabelle `ROLE_FP` in `extract.py`.
+- Die Rolle wird über einen Fingerabdruck erkannt: (Phase, Gruppen-Bit, Bitlisten der Unterblöcke) → Tabelle `ROLE_FP` in `cotrainer/extract.py`.
   - Gleiche Rollen an verschiedenen Positionen ergeben identische Daten.
   - Bestätigt per Screenshot: ST mit Ball = Halbraumstürmer, gegen den Ball = Mittelstürmer.
 - Eine Role-ID wie in `lang_db` (1800–1884) steht nicht direkt in den Daten.
@@ -215,7 +234,7 @@ Grundlage: `Trainertest 2.fm` (unverändert) gegen `Trainertest 2 traainer.fm` (
 ### Scoutinggebiet (gelöst am 10.11.)
 
 - Einstellung im Spiel, sieben Stufen. Die Spielerdatenbank im Spiel zeigt dann automatisch Spieler dieses Gebiets.
-- **Fundort:** Abschnitt `humans`, ein Byte im Muster `33 00 <Stufe> <u32> 20 00 01 00 <Datum>`. Gelesen von `read_scout_area` in `extract.py`; steht als `meta.scout_area` (Zahl) und `meta.scout_area_name` in den Daten, die Oberfläche nutzt es noch nicht.
+- **Fundort:** Abschnitt `humans`, ein Byte im Muster `33 00 <Stufe> <u32> 20 00 01 00 <Datum>`. Gelesen von `read_scout_area` in `cotrainer/extract.py`; steht als `meta.scout_area` (Zahl) und `meta.scout_area_name` in den Daten, die Oberfläche nutzt es noch nicht.
 - **Werte**, abgeglichen mit benannten Spielständen des Nutzers (Ravenna alle sieben, Paris 2 und 4):
 
   | Wert | Stufe | Beispiel Ravenna |
@@ -231,7 +250,7 @@ Grundlage: `Trainertest 2.fm` (unverändert) gegen `Trainertest 2 traainer.fm` (
 - Das `u32` nach der Stufe ist bei Ravenna 1, bei Paris 7; Bedeutung unbekannt.
 - Der alte Paris-Spielstand (`… Paris FC.fm`, 07.11.) liefert 6 = Kontinent; der Nutzer hat „Europa“ bestätigt.
 - Bei „Kein Scouting“ zeigt das Spiel laut Nutzer nur Spieler, die den Mitarbeitern bekannt sind. Wo diese Bekanntheit im Spielstand steht, ist nicht untersucht.
-- Das Muster greift nicht bei `Trainertest .fm` (zwei Manager) und nicht bei den älteren Karrieren (Ndoye, Curaçao, China; ältere Spielversion). Dort meldet `extract.py` „nicht gefunden“.
+- Das Muster greift nicht bei `Trainertest .fm` (zwei Manager) und nicht bei den älteren Karrieren (Ndoye, Curaçao, China; ältere Spielversion). Dort meldet `cotrainer/extract.py` „nicht gefunden“.
 - **Verworfen:** Der 4-Zeichen-Code in `scout_man` (`AcSP`/`blcP`) und der Filterblock daneben sind nicht das Scoutinggebiet. Sie gehören zur Spielersuche (Sortierspalte und ein Filter) und sind in allen Gebiets-Spielständen vom 10.11. gleich. Die Marken stehen rückwärts im Spielstand (`blcP` = `Pclb`, `manP` = `Pnam`, `frlp` = `plrf`).
 - **Angrenzende Ligen (vom Nutzer am 10.11. genannt):** bei Ravenna (Serie C/B) sind das Serie B, Serie C und Serie D, also die eigene Spielklasse plus je eine Stufe darüber und darunter im selben Land. Nicht geklärt: ob bei „Serie C“ alle Staffeln gemeint sind (Annahme Claude: ja) und wie die Ligastufe aus dem Spielstand gelesen wird (bisher nicht dekodiert). Die Zuordnung Land → Region/Kontinent ist gelöst, siehe unten.
 - **Ländernamen (10.11.):** `lang_db.dat`, Frame 64 (deutsch): Einträge `Datenbank-Nr.(4) len Name 00 len Kurzname 00 03 00 00 00 Kürzel len Adjektiv 00`, z. B. 776 Italien ITA, 769 Frankreich FRA, 771 Deutschland GER, 1657 Uruguay URU. 195 Länder so gelesen. Die Nummern gruppieren sich grob nach Kontinent (Afrika 5–55, Asien 106–145, Nord-/Mittelamerika 359–389, Europa 752–802, Ozeanien 1435–1444, Südamerika 1649–1662), mit Ausreißern (z. B. Montenegro, Gibraltar, Monaco weit außerhalb). Regionennamen („Südeuropa“) stehen weder in `lang_db.dat` noch in `lang_db_general.dat`. fmsave liefert je Spieler `nation_id` und die Tabelle `nation_id → database_id`, aber keine Kontinente oder Regionen.
@@ -239,13 +258,13 @@ Grundlage: `Trainertest 2.fm` (unverändert) gegen `Trainertest 2 traainer.fm` (
   - Byte 1 = **Kontinent**: 0 Afrika, 1 Asien (inkl. Australien), 2 Europa, 3 Nord-/Mittelamerika, 4 Ozeanien, 5 Südamerika, 255 keiner (aufgelöste Staaten u. Ä.). Stimmt bei allen geprüften Ländern.
   - Bytes 5–8 (u32) = **Regions-Nummer**, sehr wahrscheinlich das, was das Spiel als Region nimmt. Europa: 4 = Österreich, Belgien, Tschechien, Deutschland, Liechtenstein, Luxemburg, Polen …; 5 = Bulgarien, Ungarn, Rumänien, Serbien …; **11 = Albanien, Bosnien und Herzegowina, Kroatien, Italien, Malta, San Marino, Slowenien, Montenegro**; 12 = England, Nordirland, Irland, Schottland, Wales; 24 = Dänemark, Finnland, Island, Norwegen, Schweden; 25 = Andorra, Frankreich, Portugal, Spanien, Gibraltar; 26 = Armenien, Aserbaidschan, Zypern, Georgien, Griechenland, Nordmazedonien; 27 = Belarus, Estland, Lettland, Litauen, Russland. Südamerika: 21 = Argentinien, Brasilien, Chile, Paraguay, Uruguay; 22 = Bolivien, Kolumbien, Ecuador, Peru, Venezuela.
   - **Vom Nutzer am 10.11. bestätigt:** Das Scoutinggebiet „Südeuropa“ (Ravenna) ist genau Region 11. Scoutingstufe 5 („Region“) = alle Länder mit derselben Regions-Nummer wie das Land des eigenen Vereins; Stufe 6 („Kontinent“) = derselbe Kontinent-Code. Für andere Regionen als 11 ist das eine Übertragung, nicht einzeln geprüft.
-  - 56 der 251 Länder haben in der Namensliste aus `lang_db.dat` noch keinen Namen (Regex zu eng); noch nicht in `extract.py`.
+  - 56 der 251 Länder haben in der Namensliste aus `lang_db.dat` noch keinen Namen (Regex zu eng); noch nicht in `cotrainer/extract.py`.
 - Die Gebiets-Spielstände sind Build 27.0.1+2494687 (vorher 27.0.0+2493426).
 
 ## Getroffene Entscheidungen
 
 - Der Spielstand wird **nur gelesen, nie verändert**.
-- Ohne Pfad wird der neueste `.fm` verwendet, außer `config.json` gibt mit `save` einen anderen vor.
+- Das Programm schlägt den neuesten `.fm` des gemerkten Ordners vor. Im Konsolenlauf wird ohne Pfad der neueste `.fm` verwendet, außer `config.json` gibt mit `save` einen anderen vor.
 - **CA, PA und versteckte Attribute** werden nur intern benutzt (Bewertung, Wechselchance, Marktwert). Die JSON-Ausgabe enthält sie nicht. Spielerqualität erscheint nur als Text (`pot`, `lvl`) bzw. als relative Einordnung (`rel`).
 - **Wechselchance** ist eine eigene Schätzung (0–100). Sie berücksichtigt:
   - Vereinsstärke: Mittelwert der Top-16-CA
@@ -258,13 +277,13 @@ Grundlage: `Trainertest 2.fm` (unverändert) gegen `Trainertest 2 traainer.fm` (
   - Positionen und Rollen kommen aus dem Spielstand, sobald dort eine eigene Taktik steht.
   - Teamanweisungen und Feedback kommen weiter aus `config.json`.
   - Ist eine Rolle unbekannt, wird eine Standardrolle eingesetzt und das Kürzel als „?“ angezeigt.
-- **Trainerprofil** und **Teamanweisungen** stehen in `config.json` (aus Screenshots übernommen), weil sie noch nicht aus dem Spielstand gelesen werden.
-- Die Oberfläche speichert eigene Rollenwahl, Filter und Wochenpläne im `localStorage`, Schlüssel `fmscout:<Verein>|<Manager>`.
+- **Teamanweisungen**, Stil und Tendenzen des Trainers stehen nur in `config.json` (aus Screenshots übernommen), weil sie noch nicht aus dem Spielstand gelesen werden. Das Programm selbst liest `config.json` nicht; die Trainerbewertungen kommen aus dem Spielstand.
+- Die Oberfläche speichert eigene Rollenwahl, Filter, Wochenpläne und sichtbare Bereiche im `localStorage`, Schlüssel `cotrainer:<Verein>|<Manager>`. Die Wahl aus Schritt 3 überschreibt die sichtbaren Bereiche bei jedem Start.
 - Die Oberfläche ist auf Deutsch, mit deutschen FM27-Begriffen.
 
 ## Offene Probleme
 
-- **Paris-Spielstand ohne eigene Taktik:** In `tactics_man` stehen nur Formationsvorlagen. Für Paris greift deshalb `config.json`. Warum das so ist, ist ungeklärt.
+- **Paris-Spielstand ohne eigene Taktik:** In `tactics_man` stehen nur Formationsvorlagen. Das Programm nimmt dann die Standardformation 4-2-3-1 (`default_tactic`), ein Konsolenlauf mit `config.json` die Taktik von dort. Warum das so ist, ist ungeklärt.
 - **Nur 19 Rollen bekannt:** Bekannt sind nur die Rollen der aktuellen Taktik. Alle anderen erscheinen als „?“ mit Standardrolle. Der Rollentest läuft, siehe „Nächste Schritte“.
 - **Zuordnung ZOM-Rolle unsicher:** Für die Rolle mit Ball am ZOM (Kürzel „F“) ist „Freie Rolle“ angenommen. Der genaue FM27-Name ist unbestätigt (in `lang_db` fehlen u. a. die IDs 1810, 1826, 1828–1833, 1848, 1870).
 - **Unbekannter Einfluss der Spieleranweisungen:** Ob individuelle Spieleranweisungen die Unterblöcke verändern und damit den Fingerabdruck brechen, ist ungeprüft.
@@ -273,7 +292,6 @@ Grundlage: `Trainertest 2.fm` (unverändert) gegen `Trainertest 2 traainer.fm` (
 - **Nicht ausgelesen werden:** Scoutingbudget, Staffattribute anderer Trainer, Teamanweisungen und die Ligastufe (fmsave liest Scoutingbudget und Staffattribute). Das Scoutinggebiet wird gelesen, aber die Transfervorschläge filtern noch nicht danach.
 - **Trainertendenzen:** Die 15 Neigungen des eigenen Managers werden gelesen, stehen aber überall auf 10. Woher das Spiel die angezeigten Tendenzen nimmt, ist offen; im Programm werden sie pro Karriere ausgewählt.
 - **Zielstrebigkeit und Streitlust des Managers ändern sich zwischen Spielständen ohne Zutun** (z. B. Paris: 14 → 10); Ursache unbekannt.
-- **`FM-Scout.html` zeigt den zuletzt gelaufenen Spielstand**, auch wenn das ein Testspielstand war. Für eine Karriere `python extract.py --list` und die Nummer angeben.
 - **Torwartwahl:** Durch die Gewichtung „Ballspielender Torwart“ wählt das Programm bei Paris Nkambadio statt Trapp.
 - **Spielstandwahl:** Backups sind ausgeschlossen, aber `find_save` nimmt weiterhin den neuesten Spielstand *jeder* Karriere (keine Einschränkung auf einen Manager).
 - **Ungeprüfte Werte:** Das garantierte Mindestbudget für die nächste Saison ist nicht mit dem Spiel abgeglichen. Die Wechselchance ist eine Annahme.
@@ -282,10 +300,10 @@ Grundlage: `Trainertest 2.fm` (unverändert) gegen `Trainertest 2 traainer.fm` (
 
 ### A. Umbau zum Programm „Co-Trainer“ (Vorrang)
 
-Stand 10.11. abends: Design freigegeben, Plan für Teil 1 geschrieben, **noch nichts gebaut**.
+Stand 14.11.: **Teil 1 ist gebaut** (acht Tasks des Plans, Branch `programm-entwurf`), siehe „Was bisher gemacht wurde“ Punkt 15.
 
-1. **Nutzer sieht den Plan für Teil 1 durch** (`docs/superpowers/plans/2026-11-10-co-trainer-1-grundgeruest.md`) und wählt die Ausführungsart: mit Unteragenten (Skill `superpowers:subagent-driven-development`) oder direkt in der Sitzung (`superpowers:executing-plans`). Empfehlung von Claude: direkt, weil die acht Schritte eng aufeinander aufbauen.
-2. **Teil 1 bauen** (acht Tasks): Paket `cotrainer` mit `analyse()`, Schutzfunktion gegen versteckte Werte, Spielstandliste, Einstellungen in `%APPDATA%\Co-Trainer`, Brücke zur Oberfläche, Oberfläche mit geführtem Start, Fenster (pywebview), `Co-Trainer.exe` (PyInstaller). Braucht Python 3.12 über `python -m uv venv --python 3.12 .venv` (installiert ist 3.10).
+1. **Nutzer probiert `dist\Co-Trainer.exe` aus** (bauen mit `.\build.ps1`): einmal ganz durchklicken bis zum Ergebnis, auch mit dem Paris-Spielstand (ohne eigene Taktik) und einem alten Spielstand (China 2028). Windows zeigt beim ersten Start „Der Computer wurde durch Windows geschützt“, weil die `.exe` nicht signiert ist.
+2. **Branch `programm-entwurf` nach `main` übernehmen**, wenn der Nutzer zufrieden ist.
 3. **Danach je einen Plan schreiben und bauen:**
    - Teil 2: fmsave als Datenquelle, Kader nur erste Mannschaft, Nationalität, Scoutinggebiet als Filter, drei Informationsstufen der Transfervorschläge.
    - Teil 3: neuer Taktik-Reiter (Schwachstellen, Verursacher, Abhilfe), Trainerbewertungen als Textstufen, Auswahl der Trainertendenzen pro Karriere, Trainingsfokus.
@@ -301,7 +319,7 @@ Stand 10.11. abends: Design freigegeben, Plan für Teil 1 geschrieben, **noch ni
    - Stufengrenzen der Trainerbewertungen unterhalb von 18 (bisher nur aus Profil-Screenshots abgeleitet);
    - ob der Name „Co-Trainer“ frei ist (nicht geprüft).
 
-Entscheidungen des Nutzers vom 10.11. (alle im Design-Dokument eingearbeitet): Design samt „Entscheidungen von Claude“ freigegeben; Programmname „Co-Trainer“ (`Co-Trainer.exe`), weil „FM Scout“ eine große FM-Website ist; Trainerbewertungen bleiben im Taktik-Reiter; Trainertendenzen per Auswahl pro Karriere; bei „Kein Scouting“ trotzdem Vorschläge (bevorzugt vertragslose Spieler der Vereinsnation, auch schwächere). Ordner, Repo und bestehende Dateien werden erst beim Umbau umbenannt.
+Entscheidungen des Nutzers vom 10.11. (alle im Design-Dokument eingearbeitet): Design samt „Entscheidungen von Claude“ freigegeben; Programmname „Co-Trainer“ (`Co-Trainer.exe`), weil „FM Scout“ eine große FM-Website ist; Trainerbewertungen bleiben im Taktik-Reiter; Trainertendenzen per Auswahl pro Karriere; bei „Kein Scouting“ trotzdem Vorschläge (bevorzugt vertragslose Spieler der Vereinsnation, auch schwächere). Der Ordner und das Repo heißen weiter `fmscout`; die Dateien sind seit Teil 1 umbenannt.
 
 Der Nutzer hat jetzt den **Ingame-Editor** (muss beim Anlegen eines Spielstands aktiviert sein; Testkarriere `Haribaert Kachinski – Paris FC test.fm`, Testspielstände `Trainertest 2 …`). Damit lassen sich Werte gezielt setzen und im Spielstand wiederfinden. Das Vorgehen hat sich bewährt: Ausgangsstand speichern, auffällige, verschiedene Werte setzen (3, 5, 7 …), Screenshot, unter neuem Namen speichern, ohne einen Tag weiterzuspielen.
 
@@ -313,8 +331,8 @@ Der Nutzer hat jetzt den **Ingame-Editor** (muss beim Anlegen eines Spielstands 
    - Spieleranweisungen bleiben unverändert.
    - Er speichert und schickt die ausgefüllte Liste (TW, RV, IV rechts, IV links, LV, DM, ZM, ZOM, RA, LA, ST jeweils „mit Ball / gegen den Ball“).
    - Mit dem Ingame-Editor geht das jetzt schneller (Testkarriere statt echter Karriere).
-   - Danach `FMS_ROLES=1` setzen und `extract.py` laufen lassen; die Zeilen der Taktik „Test N“ mit der Liste abgleichen und die neuen Fingerabdrücke in `ROLE_FP` eintragen.
-   - Fehlende Rollen in `ROLES` in `app.html` ergänzen, mit Schlüsselattributen laut FM27.
+   - Danach `FMS_ROLES=1` setzen und `python -m cotrainer.extract` laufen lassen; die Zeilen der Taktik „Test N“ mit der Liste abgleichen und die neuen Fingerabdrücke in `ROLE_FP` eintragen.
+   - Fehlende Rollen in `ROLES` in `cotrainer/ui/index.html` ergänzen, mit Schlüsselattributen laut FM27.
    - Geplant sind 4–5 Durchgänge, am Ende einer mit anderer Formation (z. B. 3-4-3) für Flügelverteidiger, Libero sowie RM/LM mit Ball.
 2. Prüfen, ob Spieleranweisungen den Fingerabdruck verändern. Falls ja: nur die rollenbestimmenden Unterblöcke vergleichen.
 3. Teamanweisungen aus dem Kopf der Taktik dekodieren (Stil-Code ist erledigt). Aufbau nach dem Namen: 12×`00`, 16 Byte Einstellungen, `00 00 ff`, `len u32`, Stilname, Code4. Bisher gesehen:
