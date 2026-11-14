@@ -199,13 +199,15 @@ def player_blocks(db):
 HDR = re.compile(rb'\x00{9}(.{4})\x00(.{4})\x00\xff\xff\xff\xff\x00{5}(..)(..)', re.S)
 
 
+CLUB_PAIR = re.compile(rb'([\x02-\x40])\x00\x00\x00([^\x00-\x1f]{2,64}?)([\x02-\x30])\x00\x00\x00([^\x00-\x1f]{2,48}?)(?=[\x00-\x03])', re.S)
+
+
 def clubs(db):
     """Vereinsdatensätze: 'Name'/'Kurzname'-Paar, rund 2000 Bytes später die Markierung 03 Vereins-ID."""
     d = db.d
     hi = int(len(d) * 0.10)
     res = []
-    pair = re.compile(rb'([\x02-\x40])\x00\x00\x00([^\x00-\x1f]{2,64}?)([\x02-\x30])\x00\x00\x00([^\x00-\x1f]{2,48}?)(?=[\x00-\x03])', re.S)
-    for m in pair.finditer(d, 0, hi):
+    for m in CLUB_PAIR.finditer(d, 0, hi):
         if len(m.group(2)) != m.group(1)[0] or len(m.group(4)) != m.group(3)[0]:
             continue
         try:
@@ -247,6 +249,33 @@ def club_finances(db, c):
     if m:
         f['balance'] = struct.unpack('<i', m.group(1))[0]
     return {k: round(v * GBP_TO_EUR) for k, v in f.items()}
+
+
+def find_club_record(db, name, short):
+    """Namensdatensatz eines Vereins (für club_finances): erst Name und Kurzname gleich, sonst nur der Name.
+    Bevorzugt den ersten Kandidaten, für den club_finances etwas liefert."""
+    d = db.d
+    hi = len(d) // 10
+    if not name or d.find(name.encode('utf-8'), 0, hi) < 0:
+        return None
+    nl, sl = name.casefold(), (short or '').casefold()
+    exact, by_name = [], []
+    for m in CLUB_PAIR.finditer(d, 0, hi):
+        if len(m.group(2)) != m.group(1)[0] or len(m.group(4)) != m.group(3)[0]:
+            continue
+        try:
+            n, s = m.group(2).decode('utf-8'), m.group(4).decode('utf-8')
+        except UnicodeDecodeError:
+            continue
+        if n.casefold() != nl:
+            continue
+        rec = dict(name=n, short=s, end=m.end())
+        (exact if s.casefold() == sl else by_name).append(rec)
+    cands = exact + by_name
+    for rec in cands:
+        if club_finances(db, rec):
+            return rec
+    return cands[0] if cands else None
 
 
 def contracts(db, bpid, hstarts):

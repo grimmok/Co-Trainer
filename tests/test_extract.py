@@ -83,3 +83,18 @@ def test_every_result_passes_the_guard(monkeypatch):
     _readable(monkeypatch, lambda *a: {"squad": [{"ca": 150}]})
     with pytest.raises(HiddenValueError):
         extract.analyse("x.fm")
+
+
+def _pair(name, short):
+    n, s = name.encode(), short.encode()
+    return bytes([len(n)]) + b'\x00\x00\x00' + n + bytes([len(s)]) + b'\x00\x00\x00' + s + b'\x00'
+
+
+def test_find_club_record_prefers_exact_pair_with_finances(monkeypatch):
+    d = b'\x00' * 50 + _pair('NK Osijek', 'Osijek') + b'\x00' * 200 + _pair('NK Osijek', 'NK Osijek') + b'\x00' * 50
+    d += b'\x00' * (len(d) * 10)              # Namen liegen im ersten Zehntel
+    db = extract.DB(d)
+    monkeypatch.setattr(extract, 'club_finances', lambda db, c: {'transfer_budget': 1} if c['end'] > 200 else {})
+    r = extract.find_club_record(db, 'NK Osijek', 'NK Osijek')
+    assert r['short'] == 'NK Osijek' and r['end'] > 200
+    assert extract.find_club_record(db, 'Gibt es nicht', 'X') is None
