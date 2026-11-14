@@ -110,6 +110,25 @@ def test_map_ratings_by_name_and_birthdate():
     assert extract.map_ratings({101: (6.8, 7.1), 102: (6.0, 6.2)}, old, new) == {7: (6.8, 7.1)}
 
 
+def test_map_ratings_uses_first_and_last_name_for_common_names():
+    d = datetime.date(1995, 3, 3)
+    old = {101: {'name': 'Otávio Edmilson da Silva Monteiro', 'dob': d}}
+    new = {7: {'name': 'Otávio', 'first': 'Otávio Edmilson', 'last': 'da Silva  Monteiro', 'dob': d}}
+    assert extract.map_ratings({101: (6.8, 7.1)}, old, new) == {7: (6.8, 7.1)}
+
+
+def test_squad_and_pool_scope_depend_on_source():
+    me = 5
+    first = dict(club=me, team_slot=0, loan_parent=None)
+    reserve = dict(club=me, team_slot=1, loan_parent=None)
+    loaned_out = dict(club=9, team_slot=0, loan_parent=me)
+    other = dict(club=9, team_slot=0, loan_parent=None)
+    assert [extract.in_squad(p, me, True) for p in (first, reserve, other)] == [True, False, False]
+    assert extract.in_squad(reserve, me, False) is True          # eigener Leser: kein team_slot
+    assert [extract.in_pool_scope(p, me, True) for p in (first, loaned_out, other)] == [False, False, True]
+    assert extract.in_pool_scope(loaned_out, me, False) is True
+
+
 @pytest.mark.save
 def test_osijek_reads_first_team_from_fmsave(osijek_save):
     data = extract.analyse(osijek_save)
@@ -124,4 +143,5 @@ def test_ravenna_reads_first_team_from_fmsave(ravenna_data):
     m = ravenna_data["meta"]
     assert m["source"] == "fmsave" and m["league"] == "Serie C/B"
     assert 24 <= len(ravenna_data["squad"]) <= 28                    # 27 in der ersten Mannschaft
-    assert sum(1 for p in ravenna_data["squad"] if p.get("tr")) >= 20  # Bewertungen zugeordnet
+    assert sum(1 for p in ravenna_data["squad"] if p.get("tr")) >= 23  # Bewertungen zugeordnet (gemessen: 23)
+    assert len(m["rivals"]) == 19                                    # 20 Mannschaften, darunter die B-Mannschaft Bergamo

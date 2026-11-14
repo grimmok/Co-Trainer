@@ -313,7 +313,7 @@ Grundlage: `Trainertest 2.fm` (unverändert) gegen `Trainertest 2 traainer.fm` (
 - **Zuordnung ZOM-Rolle unsicher:** Für die Rolle mit Ball am ZOM (Kürzel „F“) ist „Freie Rolle“ angenommen. Der genaue FM27-Name ist unbestätigt (in `lang_db` fehlen u. a. die IDs 1810, 1826, 1828–1833, 1848, 1870).
 - **Unbekannter Einfluss der Spieleranweisungen:** Ob individuelle Spieleranweisungen die Unterblöcke verändern und damit den Fingerabdruck brechen, ist ungeprüft.
 - **Fehlende Spieler:** Beim eigenen Leser (Rückfall) fehlen einzelne Spieler, z. B. Otávio und Ikoné bei Paris, und Leihspieler werden nicht immer erkannt. Mit fmsave als Quelle ist das gelöst.
-- **Osijek-Finanzen nicht abgeglichen:** Transferbudget, Gehaltsbudget und Kontostand von NK Osijek (aus fmsave) müssen mit einem Screenshot der Finanzübersicht des Nutzers verglichen werden; erst dann gelten sie als geprüft.
+- **Osijek-Finanzen nicht abgeglichen:** Transferbudget, Gehaltsbudget und Kontostand von NK Osijek (aus dem eigenen Leser: `find_club_record` + `club_finances`, nicht aus fmsave) müssen mit einem Screenshot der Finanzübersicht des Nutzers verglichen werden; erst dann gelten sie als geprüft.
 - **Einlesen dauert rund zwei Minuten:** Beide Leser (fmsave und der eigene) entpacken den Spielstand je einmal.
 - **Nicht ausgelesen werden:** Scoutingbudget, Staffattribute anderer Trainer, Teamanweisungen und die Ligastufe (fmsave liest Scoutingbudget und Staffattribute). Das Scoutinggebiet wird gelesen, aber die Transfervorschläge filtern noch nicht danach.
 - **Trainertendenzen:** Die 15 Neigungen des eigenen Managers werden gelesen, stehen aber überall auf 10. Woher das Spiel die angezeigten Tendenzen nimmt, ist offen; im Programm werden sie pro Karriere ausgewählt.

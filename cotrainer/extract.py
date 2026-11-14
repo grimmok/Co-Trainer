@@ -665,7 +665,9 @@ def map_ratings(rat, old_players, new_players):
     """Trainingsbewertungen von der eigenen Spieler-ID auf die fmsave-ID übertragen (Name + Geburtsdatum).
     Nicht eindeutige Schlüssel (zwei Spieler gleich) werden ausgelassen."""
     def key(pl):
-        return (pl['name'].casefold().strip(), pl['dob'])
+        # fmsave-Name ist der Rufname (z. B. „Otávio“); der eigene Leser baut Vor- + Nachname
+        name = ' '.join(x for x in (pl.get('first'), pl.get('last')) if x) or pl['name']
+        return (' '.join(name.casefold().split()), pl['dob'])
 
     def unique(players):
         cnt = Counter(key(pl) for pl in players.values())
@@ -677,6 +679,16 @@ def map_ratings(rat, old_players, new_players):
         if old_id in rat and k in new_by_key:
             out[new_by_key[k]] = rat[old_id]
     return out
+
+
+def in_squad(pl, my_id, from_fms):
+    """Kader: Spieler des eigenen Vereins; bei fmsave nur die erste Mannschaft (team_slot 0)."""
+    return pl['club'] == my_id and (not from_fms or pl.get('team_slot') == 0)
+
+
+def in_pool_scope(pl, my_id, from_fms):
+    """Transferpool: nicht der eigene Verein; bei fmsave auch keine von uns verliehenen Spieler."""
+    return pl['club'] != my_id and not (from_fms and pl.get('loan_parent') == my_id)
 
 
 def _analyse(save, frames, names, cfg, progress):
@@ -802,8 +814,12 @@ def _analyse(save, frames, names, cfg, progress):
     log('Liga', my_league.get('name'), 'Stärke', round(lg_str, 1))
 
     if fd is not None:
-        rec = find_club_record(db, my.get('name'), my.get('short'))
-        fin = club_finances(db, rec) if rec else {}
+        if my_id not in fd.clubs:
+            log('Eigener Verein nicht in den fmsave-Vereinen:', my_id, '- keine Finanzen')
+            fin = {}
+        else:
+            rec = find_club_record(db, my.get('name'), my.get('short'))
+            fin = club_finances(db, rec) if rec else {}
     else:
         fin = club_finances(db, my) if 'end' in my else {}
     ccfg = cfg.get('clubs', {})
@@ -872,12 +888,12 @@ def _analyse(save, frames, names, cfg, progress):
             r['rel'] = rel_text(pl)
         return r
 
-    first_team = (lambda pl: pl.get('team_slot') == 0) if fd is not None else (lambda pl: True)
-    squad = [out_player(pl, True) for pl in players.values() if pl['club'] == my_id and first_team(pl)]
+    from_fms = fd is not None
+    squad = [out_player(pl, True) for pl in players.values() if in_squad(pl, my_id, from_fms)]
     require_squad(squad, os.path.basename(save))
     # Pool: Spieler, die für das eigene Niveau realistisch interessant sind
     lo, hi = my_str - 15, my_str + 35
-    cand = [pl for pl in players.values() if pl['club'] != my_id and 16 <= age_of(pl['dob']) <= 35
+    cand = [pl for pl in players.values() if in_pool_scope(pl, my_id, from_fms) and 16 <= age_of(pl['dob']) <= 35
             and (lo <= pl['ca'] <= hi or (age_of(pl['dob']) <= 21 and pl['pa'] >= my_str + 10 and pl['ca'] >= lo - 25))]
     # realistische Kandidaten zuerst: Wechselbereitschaft × Qualität
     cand.sort(key=lambda pl: -(willingness(pl) * (pl['ca'] - lo + 10)))
