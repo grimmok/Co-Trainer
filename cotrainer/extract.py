@@ -13,7 +13,7 @@ from collections import Counter, defaultdict
 
 import zstandard
 
-GBP_TO_EUR = 1.1641          # FM speichert Geld intern in Pfund
+GBP_TO_EUR = 1.1641         # FM speichert Geld intern in Pfund
 MAGIC = b'\x28\xb5\x2f\xfd'
 
 ATTR_KEYS = ['Cro', 'Dri', 'Fin', 'Hea', 'Lon', 'Mar', 'OtB', 'Pas', 'Pen', 'Tck', 'Vis', 'Han', 'Aer', 'Cmd', 'Com',
@@ -235,14 +235,19 @@ def clubs(db):
 
 
 def club_finances(db, c):
-    """Budgetblock kurz nach dem Kurznamen: 01 Start Aktuell Garantiert 00 x y Gehaltsbudget/Woche (alles £)."""
+    """Budgetblock kurz nach dem Kurznamen: 01 Start Aktuell Garantiert 00 x y W (alles £).
+    W = Gehaltskosten/Woche (wage_payroll_week); das Gehaltsbudget/Woche steht als i32 bei Blockstart+63."""
     e = c['end']
     pat = re.compile(rb'\x01(.{4})(.{4})(.{4})\x00(.{4})(.{4})(.{4})', re.S)
     f = {}
     for m in pat.finditer(db.d, e, e + 120):
         a, b, g, _, _, w = (struct.unpack('<i', m.group(k))[0] for k in range(1, 7))
         if 0 <= a < 2e9 and 0 <= b < 2e9 and 0 <= g < 2e9 and 0 < w < 1e8 and (a == 0 or 0.3 < b / a < 3):
-            f = dict(start_budget=a, transfer_budget=b, next_season_min=g, wage_budget_week=w)
+            wb = struct.unpack_from('<i', db.d, m.start() + 63)[0] if m.start() + 67 <= len(db.d) else 0
+            if not 0 < wb < 1e8:
+                log('Gehaltsbudget bei Blockstart+63 nicht lesbar (%s), Rückfall auf Gehaltskosten' % wb)
+                wb = w
+            f = dict(start_budget=a, transfer_budget=b, next_season_min=g, wage_budget_week=wb, wage_payroll_week=w)
             break
     # Kontostand (i32, £): "ff 00 <Kontostand> xxxx 01 00 6c 07 ×3 00×5" im Vereinsdatensatz
     m = re.compile(rb'\xff\x00(.{4}).{4}(?:\x01\x00\x6c\x07){3}\x00{5}', re.S).search(db.d, e, e + 4000)

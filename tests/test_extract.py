@@ -11,6 +11,7 @@ def test_analyse_ravenna(ravenna_data):
     assert m["club"] == "Ravenna Football Club 1913"
     assert m["scout_area"] == 4 and m["scout_area_name"] == "Eigenes Land"
     assert m["finances"]["transfer_budget"] == 604815
+    assert m["finances"]["wage_budget_week"] == 98362
     assert ravenna_data["tactic"]["source"] == "Spielstand"
     assert ravenna_data["tactic"]["style_name"] == "Gegenpressing"
     assert len(ravenna_data["squad"]) > 20 and len(ravenna_data["pool"]) > 1000
@@ -103,6 +104,30 @@ def test_find_club_record_prefers_exact_pair_with_finances(monkeypatch):
     assert extract.find_club_record(db, 'nk osijek', 'NK Osijek') is None
 
 
+def _budget_block(wage_budget=None, payroll=45680, pad=37):
+    import struct
+    b = b'\x01' + struct.pack('<iii', 1000000, 900000, 800000) + b'\x00' + struct.pack('<iii', 1, 2, payroll)
+    if wage_budget is not None:
+        b += b'\x00' * pad + struct.pack('<i', wage_budget)    # Blockstart + 63
+    return b'\x00' * 10 + b
+
+
+def test_club_finances_wage_budget_is_read_at_block_start_plus_63():
+    d = _budget_block(wage_budget=43339) + b'\x00' * 20
+    f = extract.club_finances(extract.DB(d), {'end': 0})
+    assert f['wage_budget_week'] == round(43339 * extract.GBP_TO_EUR)
+    assert f['wage_payroll_week'] == round(45680 * extract.GBP_TO_EUR)
+    assert f['transfer_budget'] == round(900000 * extract.GBP_TO_EUR)
+
+
+def test_club_finances_wage_budget_falls_back_to_payroll(capsys):
+    for tail in (None, 0, 10 ** 8):                      # Daten zu kurz, Wert <= 0, Wert >= 1e8
+        d = _budget_block(wage_budget=tail) + (b'' if tail is None else b'\x00' * 20)
+        f = extract.club_finances(extract.DB(d), {'end': 0})
+        assert 'Rückfall' in capsys.readouterr().out
+        assert f['wage_budget_week'] == f['wage_payroll_week'] == round(45680 * extract.GBP_TO_EUR)
+
+
 def test_map_ratings_by_name_and_birthdate():
     d1, d2 = datetime.date(2000, 1, 1), datetime.date(1999, 2, 2)
     old = {101: {'name': 'Nicolas Viola', 'dob': d1}, 102: {'name': 'Ohne Treffer', 'dob': d2}}
@@ -136,6 +161,9 @@ def test_osijek_reads_first_team_from_fmsave(osijek_save):
     assert m["source"] == "fmsave" and m["club"] == "NK Osijek" and m["manager"] == "Ivan Kurasic"
     assert m["league"] == "First League" and len(m["rivals"]) == 9
     assert 20 <= len(data["squad"]) <= 30 and len(data["pool"]) > 1000
+    f = m["finances"]                                                # per Screenshot bestätigt (14.11.)
+    assert f["wage_budget_week"] == 50451 and f["transfer_budget"] == 499998 and f["balance"] == 6713387
+    assert f["wage_payroll_week"] == 45680              # Gehaltskosten gesamt laut Screenshot
 
 
 @pytest.mark.save

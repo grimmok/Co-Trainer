@@ -63,6 +63,7 @@ Nutzerdaten:
 3. Finanzen mit Screenshots des Nutzers abgeglichen. Alle geprüften Werte stimmen:
    - Ravenna: Transferbudget 604.815 €, Gehaltsbudget 98.362 €/Woche, Kontostand 1,38 Mio. €
    - Paris: Transferbudget 4,99 Mio. €, Gehaltsbudget 719.189 €/Woche, Kontostand 80,07 Mio. €
+   - Osijek (Screenshot 14.11.): Kontostand 6,71 Mio. €, Transferbudget 499 K €, Gehaltsbudget 2.623.451 €/Jahr (50.451 €/Woche), Gehaltskosten 45.680 €/Woche
 4. Verträge mit Screenshots abgeglichen (Soleri, Spini, Tenkorang, Maggio).
 5. Trainerprofil und Taktik für Paris aus Screenshots in `config.json` übernommen. Der Nutzer hat das Profil „Offensiv/Entwickler“ gewählt.
 6. **Taktik aus dem Spielstand:** Positionen und Rollen werden jetzt aus `tactics_man` gelesen (`read_tactics` in `cotrainer/extract.py`). Beim Ravenna-Spielstand werden alle 22 Rollen erkannt. Neu in der Oberfläche:
@@ -112,7 +113,7 @@ Nutzerdaten:
     - **NK Osijek** (`Ivan Kurasic – NK Osijek.fm`): Titel „Co-Trainer · NK Osijek · First League“, Quelle `fmsave`, Kader 27, fünf Bereiche, kein JS-Fehler, keine versteckten Werte, 126 s.
     - **Ravenna**: Titel „Co-Trainer · Ravenna · Serie C/B“, Quelle `fmsave`, Kader 27, fünf Bereiche, kein JS-Fehler, 78 s.
     - Änderungsdatum aller 45 `.fm`-Dateien blieb unverändert.
-    - Offen: Osijek-Finanzen mit Screenshot abgleichen (siehe „Offene Probleme“). Ein Einlesen dauert nun rund 1,5 bis 2 Minuten, weil beide Leser entpacken.
+    - Osijek-Finanzen per Screenshot bestätigt (14.11.). Ein Einlesen dauert nun rund 1,5 bis 2 Minuten, weil beide Leser entpacken.
 
 ## Erkenntnisse zum Spielstand-Format
 
@@ -158,7 +159,7 @@ FM speichert Geld in **GBP**. Für die Anzeige gilt: **EUR = GBP × 1,1641** (ex
 
 - Name und Kurzname stehen als Paar.
 - Vereins-ID: Marker `ff <id> 00×6 04 1d`, etwa 2–3 KB nach dem Namen.
-- Budgetblock innerhalb von 120 Byte nach dem Kurznamen: `01 Start Aktuell Garantiert 00 x y Gehalt/Woche` (alle i32 in GBP).
+- Budgetblock innerhalb von 120 Byte nach dem Kurznamen: `01 Start Aktuell Garantiert 00 x y W` (alle i32 in GBP). W = Gehaltskosten/Woche (`wage_payroll_week`); das Gehaltsbudget/Woche (`wage_budget_week`) steht als i32 bei Blockstart+63.
 - Kontostand: `ff 00 <i32> xxxx (01 00 6c 07)×3 00×5`, innerhalb von 4000 Byte nach dem Namen.
 
 ### Wettbewerbe
@@ -313,7 +314,6 @@ Grundlage: `Trainertest 2.fm` (unverändert) gegen `Trainertest 2 traainer.fm` (
 - **Zuordnung ZOM-Rolle unsicher:** Für die Rolle mit Ball am ZOM (Kürzel „F“) ist „Freie Rolle“ angenommen. Der genaue FM27-Name ist unbestätigt (in `lang_db` fehlen u. a. die IDs 1810, 1826, 1828–1833, 1848, 1870).
 - **Unbekannter Einfluss der Spieleranweisungen:** Ob individuelle Spieleranweisungen die Unterblöcke verändern und damit den Fingerabdruck brechen, ist ungeprüft.
 - **Fehlende Spieler:** Beim eigenen Leser (Rückfall) fehlen einzelne Spieler, z. B. Otávio und Ikoné bei Paris, und Leihspieler werden nicht immer erkannt. Mit fmsave als Quelle ist das gelöst.
-- **Osijek-Finanzen nicht abgeglichen:** Transferbudget, Gehaltsbudget und Kontostand von NK Osijek (aus dem eigenen Leser: `find_club_record` + `club_finances`, nicht aus fmsave) müssen mit einem Screenshot der Finanzübersicht des Nutzers verglichen werden; erst dann gelten sie als geprüft.
 - **Einlesen dauert rund zwei Minuten:** Beide Leser (fmsave und der eigene) entpacken den Spielstand je einmal.
 - **Nicht ausgelesen werden:** Scoutingbudget, Staffattribute anderer Trainer, Teamanweisungen und die Ligastufe (fmsave liest Scoutingbudget und Staffattribute). Das Scoutinggebiet wird gelesen, aber die Transfervorschläge filtern noch nicht danach.
 - **Trainertendenzen:** Die 15 Neigungen des eigenen Managers werden gelesen, stehen aber überall auf 10. Woher das Spiel die angezeigten Tendenzen nimmt, ist offen; im Programm werden sie pro Karriere ausgewählt.
