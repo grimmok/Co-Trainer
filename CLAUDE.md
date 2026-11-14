@@ -18,6 +18,7 @@ Windows-Programm, das einen Football-Manager-27-Spielstand (`.fm`) liest und Kad
 ## Arbeitsweise
 
 - **Umgebung:** Python 3.12 in `.venv` (installiert ist sonst 3.10): `python -m uv venv --python 3.12 .venv`, dann `python -m uv pip install --python .venv -e ".[dev]"`.
+- **fmsave:** Die Bibliothek `fmsave` (fest `0.11.0`, braucht `backports.zstd`) liefert Spieler, Vereine und Ligen (`cotrainer/fms.py`); der eigene Leser bleibt Rückfall (`meta.source`: `fmsave` oder `eigener Leser`). Personen-IDs der beiden Leser nie über die Zahl miteinander verbinden. Ein Einlesen dauert rund zwei Minuten, weil beide Leser den Spielstand entpacken.
 - **Programm starten:** `.venv\Scripts\python -m cotrainer`.
 - **Tests:** `.venv\Scripts\python -m pytest tests -q`. Die fünf Tests mit echten Spielständen (Marke `save`) dauern rund drei Minuten; ohne sie: `-m "not save"`. Der Testspielstand ist `Haribaert Kachinski – Ravenna.fm` (anderer Pfad über `COTRAINER_TEST_SAVE`).
 - **`.exe` bauen:** `.\build.ps1` → `dist\Co-Trainer.exe`.

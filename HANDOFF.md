@@ -108,6 +108,12 @@ Nutzerdaten:
       - Schritt 1 speichert den Ordner schon bei der Prüfung (so gewollt, siehe Punkt 15).
     - **fmsave 0.11.0 an fünf Spielständen probiert:** Ravenna 33 Spieler (27 erste Mannschaft, 6 zweites Team, 1 Leihe), Paris 79 (23 / 28 / 28). `team_slot == 0` ist die erste Mannschaft; damit ist der Kaderfilter gelöst. **Curaçao und Südkorea 2028 sind FM26-Spielstände** (26.3.1 und 26.3.2) und liefern `managed_clubs() == []`; Nationaltrainer löst fmsave also nicht. `Trainertest .fm` lässt sich weiter nicht öffnen. Dauer 19–34 s je Spielstand. `ManagedClub` liefert auch Kontostand und Scoutingbudget.
 
+17. **Teil 2: `Co-Trainer.exe` mit fmsave (14.11.):** `build.ps1` packt fmsave (`--collect-submodules fmsave --copy-metadata fmsave --collect-all backports.zstd`). Bau mit `-MitSpielstand`: 66 Tests grün, `dist\Co-Trainer.exe` 13,3 MB. Probelauf aus der `.exe` (Fernsteuerung von WebView2, Fenster bis zum Ergebnis durchgeklickt):
+    - **NK Osijek** (`Ivan Kurasic – NK Osijek.fm`): Titel „Co-Trainer · NK Osijek · First League“, Quelle `fmsave`, Kader 27, fünf Bereiche, kein JS-Fehler, keine versteckten Werte, 126 s.
+    - **Ravenna**: Titel „Co-Trainer · Ravenna · Serie C/B“, Quelle `fmsave`, Kader 27, fünf Bereiche, kein JS-Fehler, 78 s.
+    - Änderungsdatum aller 45 `.fm`-Dateien blieb unverändert.
+    - Offen: Osijek-Finanzen mit Screenshot abgleichen (siehe „Offene Probleme“). Ein Einlesen dauert nun rund 1,5 bis 2 Minuten, weil beide Leser entpacken.
+
 ## Erkenntnisse zum Spielstand-Format
 
 ### Container
@@ -306,8 +312,9 @@ Grundlage: `Trainertest 2.fm` (unverändert) gegen `Trainertest 2 traainer.fm` (
 - **Nur 19 Rollen bekannt:** Bekannt sind nur die Rollen der aktuellen Taktik. Alle anderen erscheinen als „?“ mit Standardrolle. Der Rollentest läuft, siehe „Nächste Schritte“.
 - **Zuordnung ZOM-Rolle unsicher:** Für die Rolle mit Ball am ZOM (Kürzel „F“) ist „Freie Rolle“ angenommen. Der genaue FM27-Name ist unbestätigt (in `lang_db` fehlen u. a. die IDs 1810, 1826, 1828–1833, 1848, 1870).
 - **Unbekannter Einfluss der Spieleranweisungen:** Ob individuelle Spieleranweisungen die Unterblöcke verändern und damit den Fingerabdruck brechen, ist ungeprüft.
-- **Fehlende Spieler:** Bei Paris fehlen einzelne Spieler, z. B. Otávio und Ikoné (Ikoné steht aber in der Aufstellung). Leihspieler werden nicht immer erkannt.
-- **Kader nicht gefiltert:** Der Kader enthält Reserve und Jugend (Paris: 78 Spieler). Es gibt keinen Filter auf die erste Mannschaft.
+- **Fehlende Spieler:** Beim eigenen Leser (Rückfall) fehlen einzelne Spieler, z. B. Otávio und Ikoné bei Paris, und Leihspieler werden nicht immer erkannt. Mit fmsave als Quelle ist das gelöst.
+- **Osijek-Finanzen nicht abgeglichen:** Transferbudget, Gehaltsbudget und Kontostand von NK Osijek (aus fmsave) müssen mit einem Screenshot der Finanzübersicht des Nutzers verglichen werden; erst dann gelten sie als geprüft.
+- **Einlesen dauert rund zwei Minuten:** Beide Leser (fmsave und der eigene) entpacken den Spielstand je einmal.
 - **Nicht ausgelesen werden:** Scoutingbudget, Staffattribute anderer Trainer, Teamanweisungen und die Ligastufe (fmsave liest Scoutingbudget und Staffattribute). Das Scoutinggebiet wird gelesen, aber die Transfervorschläge filtern noch nicht danach.
 - **Trainertendenzen:** Die 15 Neigungen des eigenen Managers werden gelesen, stehen aber überall auf 10. Woher das Spiel die angezeigten Tendenzen nimmt, ist offen; im Programm werden sie pro Karriere ausgewählt.
 - **Zielstrebigkeit und Streitlust des Managers ändern sich zwischen Spielständen ohne Zutun** (z. B. Paris: 14 → 10); Ursache unbekannt.
@@ -340,7 +347,7 @@ Stand 14.11.: **Teil 1 ist gebaut** (acht Tasks des Plans, Branch `programm-entw
    - Teil 2: fmsave als Datenquelle, Kader nur erste Mannschaft, Nationalität, Scoutinggebiet als Filter, drei Informationsstufen der Transfervorschläge.
    - Teil 3: neuer Taktik-Reiter (Schwachstellen, Verursacher, Abhilfe), Trainerbewertungen als Textstufen, Auswahl der Trainertendenzen pro Karriere, Trainingsfokus.
    - Teil 4: README, Lizenzhinweise, GitHub-Release.
-   - Für den Plan von Teil 2 geklärt (Punkt 16): fmsave löst weder Nationaltrainer noch zwei Manager; die Meldung `require_squad` und der eigene Leser als Rückfall bleiben. Noch zu klären: wie fmsave (Python ≥ 3.12, feste Version) in die `.exe` gepackt wird.
+   - Für den Plan von Teil 2 geklärt (Punkt 16): fmsave löst weder Nationaltrainer noch zwei Manager; die Meldung `require_squad` und der eigene Leser als Rückfall bleiben. Gepackt wird fmsave über `build.ps1` (siehe Punkt 17).
 6. **Für Teil 2 noch zu dekodieren:**
    - Ligastufe je Wettbewerb (für „Angrenzende Ligen“ = eigene Spielklasse ± 1 im selben Land).
    - Die 56 Länder ohne deutschen Namen (Regex für `lang_db.dat`, Frame 64, ist zu eng).

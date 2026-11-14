@@ -13,6 +13,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Tests fehlgeschlagen - es wird nichts gebaut.'
 
 # Nur index.html wird eingepackt; dev-data.json und config.json bleiben draußen.
 & $python -m PyInstaller --noconfirm --clean --onefile --windowed --name Co-Trainer `
+    --collect-submodules fmsave --copy-metadata fmsave --collect-all backports.zstd `
     --add-data 'cotrainer/ui/index.html;cotrainer/ui' cotrainer/__main__.py
 if ($LASTEXITCODE -ne 0) { throw 'PyInstaller ist fehlgeschlagen.' }
 
