@@ -14,3 +14,11 @@ __pycache__/
 
 # Entwürfe aus dem Brainstorming
 .superpowers/
+
+# Co-Trainer: Umgebung, Bauergebnisse, Entwicklerdaten
+.venv/
+dist/
+build/
+*.egg-info/
+*.spec
+cotrainer/ui/dev-data.json

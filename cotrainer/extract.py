@@ -1,20 +1,18 @@
-﻿"""FM-Scout: liest einen Football-Manager-27-Spielstand (.fm) und erzeugt die Analyse-Seite.
+"""Co-Trainer: liest einen Football-Manager-27-Spielstand (.fm) und liefert die Daten für die Oberfläche.
 
-Aufruf:  python extract.py [Pfad\\zum\\Spielstand.fm | Nummer]
-         python extract.py --list      (Spielstände mit Nummer auflisten)
+analyse(Pfad) gibt ein Wörterbuch zurück (meta, coach, tactic, squad, pool, training).
+Konsolenaufruf zur Kontrolle:
+         python -m cotrainer.extract [Pfad\\zum\\Spielstand.fm | Nummer] [--dump Datei.json]
+         python -m cotrainer.extract --list      (Spielstände mit Nummer auflisten)
 Ohne Angabe wird der zuletzt gespeicherte Spielstand verwendet (Sicherungen ausgenommen).
-FMS_ROLES=1 gibt die Rollen-Fingerabdrücke aller Taktiken aus (für den Rollentest).
+FMS_DEBUG=Name1,Name2 gibt Rohwerte einzelner Spieler aus, FMS_ROLES=1 die Rollen-Fingerabdrücke aller Taktiken.
 Der Spielstand wird nur gelesen, nie verändert.
 """
 import array, bisect, datetime, glob, json, math, os, re, struct, sys, time
 from collections import Counter, defaultdict
 
-try:
-    import zstandard
-except ImportError:
-    sys.exit('Bitte zuerst installieren:  python -m pip install zstandard')
+import zstandard
 
-HERE = os.path.dirname(os.path.abspath(__file__))
 GBP_TO_EUR = 1.1641          # FM speichert Geld intern in Pfund
 MAGIC = b'\x28\xb5\x2f\xfd'
 
@@ -26,7 +24,18 @@ HIDDEN = {'Cons', 'Dirt', 'ImpM', 'InjPr', 'Vers'}
 POS_KEYS = ['GK', 'SW', 'DL', 'DC', 'DR', 'DM', 'ML', 'MC', 'MR', 'AML', 'AMC', 'AMR', 'ST', 'WBL', 'WBR']
 
 
+PROGRESS_STEPS = ('Spielstand wird geöffnet …', 'Spieler werden gelesen …', 'Verträge und Vereine werden gelesen …',
+                  'Ligen und Finanzen werden gelesen …', 'Training und Taktik werden gelesen …',
+                  'Kader wird ausgewertet …')
+
+
+class SaveReadError(Exception):
+    """Der Spielstand lässt sich nicht lesen; die Meldung ist deutscher Klartext für die Oberfläche."""
+
+
 def log(*a):
+    if sys.stdout is None:          # Programm ohne Konsole (Co-Trainer.exe)
+        return
     print(time.strftime('%H:%M:%S'), *a, flush=True)
 
 
@@ -49,10 +58,10 @@ def find_save(arg):
         return arg
     cands = list_saves()
     if not cands:
-        sys.exit('Kein Spielstand gefunden. Bitte Pfad angeben: python extract.py "...\\Spielstand.fm"')
-    k = int(arg) if arg else 1          # Nummer aus "python extract.py --list"
+        sys.exit('Kein Spielstand gefunden. Bitte Pfad angeben: python -m cotrainer.extract "...\\Spielstand.fm"')
+    k = int(arg) if arg else 1          # Nummer aus "python -m cotrainer.extract --list"
     if not 1 <= k <= len(cands):
-        sys.exit(f'Es gibt nur {len(cands)} Spielstände (siehe python extract.py --list).')
+        sys.exit(f'Es gibt nur {len(cands)} Spielstände (siehe python -m cotrainer.extract --list).')
     return cands[k - 1]
 
 
@@ -80,7 +89,8 @@ def find_lang_db(cfg):
 
 # ---------------------------------------------------------------- fmf-Container
 def read_frames(path):
-    data = open(path, 'rb').read()
+    with open(path, 'rb') as f:
+        data = f.read()
     dz = zstandard.ZstdDecompressor()
     frames, offs = [], []
     pos = data.find(MAGIC)
@@ -111,7 +121,8 @@ def directory(frames, offs):
 def comp_names(lang_path):
     if not lang_path:
         return {}
-    data = open(lang_path, 'rb').read()
+    with open(lang_path, 'rb') as f:
+        data = f.read()
     dz = zstandard.ZstdDecompressor()
     rec = re.compile(rb'(.{4})([\x02-\x60])\x00\x00\x00([^\xff\x00]{2,96})\xff([\x01-\x60])\x00\x00\x00([^\xff\x00]{1,96})\xff', re.S)
     pos, n = data.find(MAGIC), 0
@@ -562,31 +573,62 @@ def est_value(ca, pa, age, years_left, lg_factor):
     return int(round(base * lg_factor, -3))
 
 
-# ---------------------------------------------------------------- Hauptprogramm
-def main():
-    cfg_path = os.path.join(HERE, 'config.json')
-    cfg = json.load(open(cfg_path, encoding='utf-8')) if os.path.exists(cfg_path) else {}
-    if len(sys.argv) > 1 and sys.argv[1] in ('--list', '-l'):
-        print_saves()
-        return
-    save = find_save(sys.argv[1] if len(sys.argv) > 1 else cfg.get('save'))
+# ---------------------------------------------------------------- Spielstand-Übersicht
+SUMMARY_RE = re.compile(rb'([\x02-\x40])\x00\x00\x00([^\x00-\x1f]{2,64}?)([\x02-\x40])\x00\x00\x00([^\x00-\x1f]{2,64}?)'
+                        rb'(.{4})(..)([\xe8-\xef]\x07)', re.S)
+
+
+def parse_summary(raw):
+    """Manager, Vereinsname und Spieldatum aus dem Abschnitt save_game_summary."""
+    manager, game_date, club_name = '', None, ''
+    for m in SUMMARY_RE.finditer(raw):
+        if len(m.group(2)) == m.group(1)[0] and len(m.group(4)) == m.group(3)[0]:
+            manager = m.group(2).decode('utf-8', 'replace')
+            club_name = m.group(4).decode('utf-8', 'replace')
+            dd, yy = struct.unpack('<H', m.group(6))[0] & 0x1ff, struct.unpack('<H', m.group(7))[0]
+            game_date = datetime.date(yy, 1, 1) + datetime.timedelta(days=dd - 1)
+    return dict(manager=manager, club=club_name, game_date=game_date)
+
+
+def default_tactic():
+    """4-2-3-1 mit Standardrollen – wenn weder der Spielstand noch config.json eine Taktik liefern."""
+    layout = [('GK', 0), ('DR', 0), ('DC', 0x20), ('DC', 0x10), ('DL', 0), ('MC', 0x20), ('MC', 0x10),
+              ('AMR', 0), ('AMC', 0), ('AML', 0), ('ST', 0)]
+    slots = []
+    for pos, side in layout:
+        x, y = POS_XY[pos]
+        dx = SIDE_DX.get(pos, 0)
+        x += dx if side == 0x20 else -dx if side == 0x10 else 0
+        ip, oop = ROLE_DEFAULT[pos]
+        slots.append([pos, x, y, ip, oop, '', '', pos])
+    return dict(name='Standard 4-2-3-1', slots=slots, source='Standard')
+
+
+# ---------------------------------------------------------------- Analyse
+def analyse(save_path, cfg=None, progress=None):
+    """Liest den Spielstand und liefert die Daten für die Oberfläche (ohne CA, PA und versteckte Werte).
+
+    progress erhält nacheinander die Texte aus PROGRESS_STEPS. Unlesbare Dateien ergeben SaveReadError."""
+    try:
+        return _analyse(save_path, cfg or {}, progress or (lambda text: None))
+    except (OSError, zstandard.ZstdError, KeyError, IndexError, struct.error) as e:
+        raise SaveReadError(f'Das ist kein lesbarer FM27-Spielstand: {os.path.basename(save_path)}') from e
+
+
+def _analyse(save, cfg, progress):
+    progress(PROGRESS_STEPS[0])
     log('Spielstand:', save)
     frames, offs = read_frames(save)
     names = directory(frames, offs)
     db = DB(frames[names['game_db']])
     log('Datenbank', len(db.d) // 1_000_000, 'MB')
 
-    summary = frames[names['save_game_summary']]
-    manager, game_date, club_name = '', None, ''
-    for m in re.finditer(rb'([\x02-\x40])\x00\x00\x00([^\x00-\x1f]{2,64}?)([\x02-\x40])\x00\x00\x00([^\x00-\x1f]{2,64}?)(.{4})(..)([\xe8-\xef]\x07)', summary, re.S):
-        if len(m.group(2)) == m.group(1)[0] and len(m.group(4)) == m.group(3)[0]:
-            manager = m.group(2).decode('utf-8', 'replace')
-            club_name = m.group(4).decode('utf-8', 'replace')
-            dd, yy = struct.unpack('<H', m.group(6))[0] & 0x1ff, struct.unpack('<H', m.group(7))[0]
-            game_date = datetime.date(yy, 1, 1) + datetime.timedelta(days=dd - 1)
-    game_date = game_date or datetime.date.today()
+    summary = parse_summary(frames[names['save_game_summary']])
+    manager, club_name = summary['manager'], summary['club']
+    game_date = summary['game_date'] or datetime.date.today()
     log('Manager', manager, 'Datum', game_date)
 
+    progress(PROGRESS_STEPS[1])
     tabs = name_tables(db)
     F, L = (tabs + [{}, {}])[:2]
     log('Namen', len(F), len(L))
@@ -614,15 +656,10 @@ def main():
         hstarts.append(o - 9)
         hinfo.append((first, last, dob, dpos, full))
     log('Personen', len(hstarts))
-    bset = sorted(blocks)
 
+    progress(PROGRESS_STEPS[2])
     club_map = clubs(db)
     log('Vereine', len(club_map))
-    lang = find_lang_db(cfg)
-    cnames = comp_names(lang)
-    log('Wettbewerbsnamen', len(cnames), lang or '(nicht gefunden)')
-    comps = competitions(frames, names, cnames)
-
     bpid = {db.u32(p - 43): p for p in blocks}
     con = contracts(db, bpid, hstarts)
     log('Verträge', len(con))
@@ -644,8 +681,20 @@ def main():
             if any(s in pl['name'] for s in os.environ['FMS_DEBUG'].split(',')):
                 print('DEBUG', pl['name'], pl['dob'], pl['club'], 'CA', pl['ca'], 'PA', pl['pa'], pl['pos'],
                       [round(x / 5) for x in pl['attrs']], 'Persönlichkeit (Rohbytes)', pl['pers'])
-    rat, weeks = training(frames, names)
 
+    progress(PROGRESS_STEPS[3])
+    lang = find_lang_db(cfg)
+    cnames = comp_names(lang)
+    log('Wettbewerbsnamen', len(cnames), lang or '(nicht gefunden)')
+    comps = competitions(frames, names, cnames)
+
+    progress(PROGRESS_STEPS[4])
+    rat, weeks = training(frames, names)
+    saved = read_tactics(frames, names)
+    scout_area = read_scout_area(frames, names)
+    coach_save = read_coach(db.d, manager)
+
+    progress(PROGRESS_STEPS[5])
     # menschlicher Verein = Verein der meisten Spieler in der Trainingsbewertung
     cc = Counter(players[p]['club'] for p in rat if p in players)
     my_id = cc.most_common(1)[0][0] if cc else None
@@ -722,6 +771,11 @@ def main():
             score += 6
         return max(2, min(97, round(score)))
 
+    def rel_text(pl):
+        """Relative Einordnung zum eigenen Kader als Text; die Zahl dahinter bleibt intern."""
+        gap = round(pl['ca'] - my_str)
+        return 'deutlich stärker' if gap > 25 else 'stärker' if gap > 10 else 'ähnlich' if gap > -5 else 'schwächer'
+
     def out_player(pl, mine):
         age = age_of(pl['dob'])
         c = con.get(pl['id'], {})
@@ -740,7 +794,7 @@ def main():
             r['tr'] = rat.get(pl['id'])
         else:
             r['will'] = willingness(pl)
-            r['q'] = round(pl['ca'] - my_str)      # nur relative Einordnung, keine CA
+            r['rel'] = rel_text(pl)
         return r
 
     squad = [out_player(pl, True) for pl in players.values() if pl['club'] == my_id]
@@ -748,19 +802,13 @@ def main():
     lo, hi = my_str - 15, my_str + 35
     cand = [pl for pl in players.values() if pl['club'] != my_id and 16 <= age_of(pl['dob']) <= 35
             and (lo <= pl['ca'] <= hi or (age_of(pl['dob']) <= 21 and pl['pa'] >= my_str + 10 and pl['ca'] >= lo - 25))]
-    for pl in cand:
-        pl['_w'] = willingness(pl)
     # realistische Kandidaten zuerst: Wechselbereitschaft × Qualität
-    cand.sort(key=lambda pl: -(pl['_w'] * (pl['ca'] - lo + 10)))
+    cand.sort(key=lambda pl: -(willingness(pl) * (pl['ca'] - lo + 10)))
     pool = [out_player(pl, False) for pl in cand[:cfg.get('pool_size', 6000)]]
-    for p in pool:
-        q = p.pop('q')
-        p['rel'] = 'deutlich stärker' if q > 25 else 'stärker' if q > 10 else 'ähnlich' if q > -5 else 'schwächer'
     log('Kader', len(squad), 'Pool', len(pool))
 
     # Taktik: Positionen + Rollen aus dem Spielstand, Anweisungen/Feedback aus config.json
     tactic = dict(club_cfg.get('tactic', {}))
-    saved = read_tactics(frames, names)
     if saved:
         st = next((x for x in saved if x['active']), saved[0])
         tactic.update(name=st['name'], slots=st['slots'], source='Spielstand', unknown_roles=st['unknown'],
@@ -774,11 +822,12 @@ def main():
     elif tactic.get('slots'):
         tactic['source'] = 'config.json'
         log('Keine eigene Taktik im Spielstand – nutze config.json')
+    else:
+        tactic.update(default_tactic())
+        log('Keine eigene Taktik im Spielstand und keine in config.json – Standardformation')
 
-    scout_area = read_scout_area(frames, names)
     # Trainerprofil: Bewertungen aus dem Spielstand haben Vorrang vor config.json (als Textstufe wie im Spiel)
     coach = dict(club_cfg.get('coach', {}))
-    coach_save = read_coach(db.d, manager)
     if coach_save:
         coach['coaching'] = {k: coach_band(v) for k, v in coach_save['coaching'].items()}
         coach['mental'] = {k: coach_band(v) for k, v in coach_save['mental'].items()}
@@ -786,10 +835,10 @@ def main():
         log('Trainer laut Spielstand:', coach_save['coaching'], coach_save['mental'])
         log('Neigungen laut Spielstand:', coach_save['tendencies'])
     else:
-        log('Trainerwerte im Spielstand nicht gefunden – nutze config.json')
+        log('Trainerwerte im Spielstand nicht gefunden')
     log('Scoutinggebiet:', SCOUT_AREAS.get(scout_area, 'nicht gefunden'), scout_area or '')
 
-    data = dict(
+    return dict(
         meta=dict(manager=manager, date=game_date.isoformat(), club=my.get('name'), club_short=my.get('short'),
                   scout_area=scout_area, scout_area_name=SCOUT_AREAS.get(scout_area),
                   league=my_league.get('name', ''), league_long=my_league.get('long', ''),
@@ -798,15 +847,38 @@ def main():
         coach=coach, tactic=tactic,
         squad=squad, pool=pool, training=dict(weeks=weeks),
     )
-    tpl = open(os.path.join(HERE, 'app.html'), encoding='utf-8-sig').read()
-    out = os.path.join(HERE, 'FM-Scout.html')
-    js = json.dumps(data, ensure_ascii=False, separators=(',', ':')).replace('</', '<\\/')
-    open(out, 'w', encoding='utf-8').write(tpl.replace('/*__DATA__*/null', js))
-    log('Fertig:', out)
+
+
+# ---------------------------------------------------------------- Konsolenaufruf
+def main(argv=None):
+    args = list(sys.argv[1:] if argv is None else argv)
+    cfg = {}
+    if os.path.exists('config.json'):               # Entwicklerhilfe, nur im aktuellen Ordner
+        with open('config.json', encoding='utf-8') as f:
+            cfg = json.load(f)
+    if args and args[0] in ('--list', '-l'):
+        print_saves()
+        return
+    dump = None
+    if '--dump' in args:
+        k = args.index('--dump')
+        if k + 1 >= len(args):
+            sys.exit('Nach --dump fehlt der Dateiname.')
+        dump = args[k + 1]
+        del args[k:k + 2]
+    save = find_save(args[0] if args else cfg.get('save'))
+    try:
+        data = analyse(save, cfg)
+    except SaveReadError as e:
+        sys.exit(str(e))
+    if dump:
+        with open(dump, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, separators=(',', ':'))
+        log('Geschrieben:', dump)
+    else:
+        log('Fertig:', data['meta']['club'], '| Kader', len(data['squad']), '| Pool', len(data['pool']),
+            '(Datei nur mit --dump)')
 
 
 if __name__ == '__main__':
     main()
-
-
-

@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cotrainer"
+version = "0.1.0"
+description = "Co-Trainer: liest einen Football-Manager-27-Spielstand und analysiert Kader, Taktik, Transfers und Training."
+requires-python = ">=3.12"
+dependencies = ["zstandard", "pywebview"]
+
+[project.optional-dependencies]
+dev = ["pytest", "pyinstaller"]
+
+[tool.setuptools]
+packages = ["cotrainer"]
+
+[tool.setuptools.package-data]
+cotrainer = ["ui/*.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["save: braucht einen echten Spielstand"]
