@@ -376,7 +376,7 @@ ROLE_FP = {
     ('oop', 35, ((38,), (54,))): ('twm', 'ÄMF', 'Äußerer Mittelfeldspieler'),
     ('oop', 42, ((43,), (54,))): ('cfo', 'MS', 'Mittelstürmer'),
 }
-# Stil-Code im Taktikkopf -> Schlüssel in STYLES (app.html). Weitere Codes erst nach Bestätigung eintragen.
+# Stil-Code im Taktikkopf -> Schlüssel in STYLES (ui/index.html). Weitere Codes erst nach Bestätigung eintragen.
 STYLE_CODES = {'TREV': 'vertical_tikitaka', 'EGEG': 'gegenpress'}
 # Ersatzrolle, wenn ein Fingerabdruck (noch) unbekannt ist
 ROLE_DEFAULT = {'GK': ('gk', 'gk'), 'SW': ('cb', 'cb'), 'DC': ('cb', 'cb'), 'DR': ('fb', 'fb'), 'DL': ('fb', 'fb'),
