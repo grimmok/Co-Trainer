@@ -43,10 +43,10 @@ def test_player_record_edge_cases():
 def test_comps_from_fixtures_uses_first_team_league_matches():
     fx = [NS(competition_id=5, home_club_uid=a, away_club_uid=b, home_team_slot=0, away_team_slot=0)
           for a, b in [(1, 2), (3, 4), (5, 6), (1, 3), (2, 4), (6, 5)]]
-    fx += [NS(competition_id=5, home_club_uid=7, away_club_uid=1, home_team_slot=1, away_team_slot=0)]  # B-Team in der Liga
+    fx += [NS(competition_id=5, home_club_uid=7, away_club_uid=1, home_team_slot=1, away_team_slot=0)]  # B-Team (Stammverein 7) zählt nicht
     fx += [NS(competition_id=9, home_club_uid=1, away_club_uid=2, home_team_slot=1, away_team_slot=1)]  # U-Mannschaft
     c = fms.comps_from_fixtures(fx, {5: 4312, 9: 99}, {4312: ('Italian Serie C/B', 'Serie C/B')})
-    assert c == {5: {'name': 'Serie C/B', 'long': 'Italian Serie C/B', 'teams': [1, 2, 3, 4, 5, 6, 7]}}
+    assert c == {5: {'name': 'Serie C/B', 'long': 'Italian Serie C/B', 'teams': [1, 2, 3, 4, 5, 6]}}
 
 def test_pick_own_club_prefers_summary_name():
     m = [NS(club_uid=1, club_name='A', club_short_name='A'), NS(club_uid=2, club_name='NK Osijek', club_short_name='Osijek')]

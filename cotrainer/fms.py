@@ -71,8 +71,9 @@ def comps_from_fixtures(fixtures, comp_db, cnames):
     """Ligen aus den Spielen mit mindestens einer ersten Mannschaft: je Wettbewerb die beteiligten Vereine."""
     teams = {}
     for f in fixtures:
-        # mindestens eine erste Mannschaft: so fallen reine Nachwuchsligen weg, B-Mannschaften in Seniorenligen bleiben
-        if 0 in (f.home_team_slot, f.away_team_slot) and f.home_club_uid is not None \
+        # beide Seiten erste Mannschaft: eine B-Mannschaft trägt die Vereins-ID ihres Stammvereins und würde
+        # diesen sonst in die falsche Liga ziehen
+        if f.home_team_slot == 0 and f.away_team_slot == 0 and f.home_club_uid is not None \
                 and f.away_club_uid is not None:
             teams.setdefault(f.competition_id, set()).update((f.home_club_uid, f.away_club_uid))
     comps = {}

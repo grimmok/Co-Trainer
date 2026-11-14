@@ -172,4 +172,4 @@ def test_ravenna_reads_first_team_from_fmsave(ravenna_data):
     assert m["source"] == "fmsave" and m["league"] == "Serie C/B"
     assert 24 <= len(ravenna_data["squad"]) <= 28                    # 27 in der ersten Mannschaft
     assert sum(1 for p in ravenna_data["squad"] if p.get("tr")) >= 23  # Bewertungen zugeordnet (gemessen: 23)
-    assert len(m["rivals"]) == 19                                    # 20 Mannschaften, darunter die B-Mannschaft Bergamo
+    assert len(m["rivals"]) == 18
