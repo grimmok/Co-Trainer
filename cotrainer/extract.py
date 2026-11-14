@@ -252,13 +252,12 @@ def club_finances(db, c):
 
 
 def find_club_record(db, name, short):
-    """Namensdatensatz eines Vereins (für club_finances): erst Name und Kurzname gleich, sonst nur der Name.
+    """Namensdatensatz eines Vereins (für club_finances): erst Name und Kurzname exakt gleich (Groß-/Kleinschreibung zählt), sonst nur der Name.
     Bevorzugt den ersten Kandidaten, für den club_finances etwas liefert."""
     d = db.d
     hi = len(d) // 10
     if not name or d.find(name.encode('utf-8'), 0, hi) < 0:
         return None
-    nl, sl = name.casefold(), (short or '').casefold()
     exact, by_name = [], []
     for m in CLUB_PAIR.finditer(d, 0, hi):
         if len(m.group(2)) != m.group(1)[0] or len(m.group(4)) != m.group(3)[0]:
@@ -267,10 +266,10 @@ def find_club_record(db, name, short):
             n, s = m.group(2).decode('utf-8'), m.group(4).decode('utf-8')
         except UnicodeDecodeError:
             continue
-        if n.casefold() != nl:
+        if n != name:
             continue
         rec = dict(name=n, short=s, end=m.end())
-        (exact if s.casefold() == sl else by_name).append(rec)
+        (exact if s == short else by_name).append(rec)
     cands = exact + by_name
     for rec in cands:
         if club_finances(db, rec):

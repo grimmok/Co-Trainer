@@ -98,3 +98,4 @@ def test_find_club_record_prefers_exact_pair_with_finances(monkeypatch):
     r = extract.find_club_record(db, 'NK Osijek', 'NK Osijek')
     assert r['short'] == 'NK Osijek' and r['end'] > 200
     assert extract.find_club_record(db, 'Gibt es nicht', 'X') is None
+    assert extract.find_club_record(db, 'nk osijek', 'NK Osijek') is None
