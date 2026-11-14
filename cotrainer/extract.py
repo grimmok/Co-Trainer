@@ -661,6 +661,24 @@ def analyse(save_path, cfg=None, progress=None):
 REQUIRED_SECTIONS = ('game_db', 'save_game_summary', 'training_man')
 
 
+def map_ratings(rat, old_players, new_players):
+    """Trainingsbewertungen von der eigenen Spieler-ID auf die fmsave-ID übertragen (Name + Geburtsdatum).
+    Nicht eindeutige Schlüssel (zwei Spieler gleich) werden ausgelassen."""
+    def key(pl):
+        return (pl['name'].casefold().strip(), pl['dob'])
+
+    def unique(players):
+        cnt = Counter(key(pl) for pl in players.values())
+        return {key(pl): pid for pid, pl in players.items() if cnt[key(pl)] == 1}
+    new_by_key = unique(new_players)
+    old_by_key = unique(old_players)
+    out = {}
+    for k, old_id in old_by_key.items():
+        if old_id in rat and k in new_by_key:
+            out[new_by_key[k]] = rat[old_id]
+    return out
+
+
 def _analyse(save, frames, names, cfg, progress):
     db = DB(frames[names['game_db']])
     log('Datenbank', len(db.d) // 1_000_000, 'MB')
@@ -718,11 +736,6 @@ def _analyse(save, frames, names, cfg, progress):
             dob=dob, club=c['club'], ca=db.u16(p - 24), pa=db.u16(p - 22),
             pos=list(db.d[p:p + 15]), attrs=attrs, pers=pers)
     log('Spieler zugeordnet', len(players))
-    if os.environ.get('FMS_DEBUG'):
-        for pl in players.values():
-            if any(s in pl['name'] for s in os.environ['FMS_DEBUG'].split(',')):
-                print('DEBUG', pl['name'], pl['dob'], pl['club'], 'CA', pl['ca'], 'PA', pl['pa'], pl['pos'],
-                      [round(x / 5) for x in pl['attrs']], 'Persönlichkeit (Rohbytes)', pl['pers'])
 
     progress(PROGRESS_STEPS[3])
     lang = find_lang_db(cfg)
@@ -732,20 +745,36 @@ def _analyse(save, frames, names, cfg, progress):
 
     progress(PROGRESS_STEPS[4])
     rat, weeks = training(frames, names)
+    from . import fms           # erst hier: fms importiert dieses Modul
+    fd = fms.read(save, cnames, club_name)
+    if fd is not None:
+        # Alle Nachschlagetabellen kommen aus fmsave; die IDs beider Leser sind verschieden nummeriert.
+        rat = map_ratings(rat, players, fd.players)
+        players, con, club_map, comps = fd.players, fd.contracts, fd.clubs, fd.comps
+    source = 'fmsave' if fd is not None else 'eigener Leser'
+    log('Quelle', source, len(players), 'Spieler')
+    if os.environ.get('FMS_DEBUG'):
+        for pl in players.values():
+            if any(s in pl['name'] for s in os.environ['FMS_DEBUG'].split(',')):
+                print('DEBUG', pl['name'], pl['dob'], pl['club'], 'CA', pl['ca'], 'PA', pl['pa'], pl['pos'],
+                      [round(x / 5) for x in pl['attrs']], 'Persönlichkeit (Rohbytes)', pl['pers'])
     saved = read_tactics(frames, names)
     scout_area = read_scout_area(frames, names)
     coach_save = read_coach(db.d, manager)
 
     progress(PROGRESS_STEPS[5])
     # menschlicher Verein = Verein der meisten Spieler in der Trainingsbewertung
-    cc = Counter(players[p]['club'] for p in rat if p in players)
-    my_id = cc.most_common(1)[0][0] if cc else None
-    if my_id is None or club_map.get(my_id, {}).get('short') != club_name:
-        # Vereinsname aus der Spielstand-Übersicht; bei Namensgleichheit den Verein mit den meisten Spielern nehmen
-        npl = Counter(pl['club'] for pl in players.values())
-        cands = [cid for cid, c in club_map.items() if club_name in (c['short'], c['name'])]
-        if cands:
-            my_id = max(cands, key=lambda c: npl.get(c, 0))
+    if fd is not None:
+        my_id = fd.own_club
+    else:
+        cc = Counter(players[p]['club'] for p in rat if p in players)
+        my_id = cc.most_common(1)[0][0] if cc else None
+        if my_id is None or club_map.get(my_id, {}).get('short') != club_name:
+            # Vereinsname aus der Spielstand-Übersicht; bei Namensgleichheit den Verein mit den meisten Spielern nehmen
+            npl = Counter(pl['club'] for pl in players.values())
+            cands = [cid for cid, c in club_map.items() if club_name in (c['short'], c['name'])]
+            if cands:
+                my_id = max(cands, key=lambda c: npl.get(c, 0))
     my = club_map.get(my_id, {'name': '?', 'short': '?'})
     log('Eigener Verein', my.get('name'), my_id)
 
@@ -772,7 +801,11 @@ def _analyse(save, frames, names, cfg, progress):
     lg_str = my_league.get('strength', my_str)
     log('Liga', my_league.get('name'), 'Stärke', round(lg_str, 1))
 
-    fin = club_finances(db, my) if 'end' in my else {}
+    if fd is not None:
+        rec = find_club_record(db, my.get('name'), my.get('short'))
+        fin = club_finances(db, rec) if rec else {}
+    else:
+        fin = club_finances(db, my) if 'end' in my else {}
     ccfg = cfg.get('clubs', {})
     club_cfg = ccfg.get(my.get('short'), ccfg.get(my.get('name'), {}))
     log('Finanzen', fin)
@@ -839,7 +872,8 @@ def _analyse(save, frames, names, cfg, progress):
             r['rel'] = rel_text(pl)
         return r
 
-    squad = [out_player(pl, True) for pl in players.values() if pl['club'] == my_id]
+    first_team = (lambda pl: pl.get('team_slot') == 0) if fd is not None else (lambda pl: True)
+    squad = [out_player(pl, True) for pl in players.values() if pl['club'] == my_id and first_team(pl)]
     require_squad(squad, os.path.basename(save))
     # Pool: Spieler, die für das eigene Niveau realistisch interessant sind
     lo, hi = my_str - 15, my_str + 35
@@ -882,7 +916,7 @@ def _analyse(save, frames, names, cfg, progress):
     log('Scoutinggebiet:', SCOUT_AREAS.get(scout_area, 'nicht gefunden'), scout_area or '')
 
     return dict(
-        meta=dict(manager=manager, date=game_date.isoformat(), club=my.get('name'), club_short=my.get('short'),
+        meta=dict(source=source, manager=manager, date=game_date.isoformat(), club=my.get('name'), club_short=my.get('short'),
                   scout_area=scout_area, scout_area_name=SCOUT_AREAS.get(scout_area),
                   league=my_league.get('name', ''), league_long=my_league.get('long', ''),
                   finances=fin, save=os.path.basename(save), created=datetime.datetime.now().isoformat(timespec='minutes'),

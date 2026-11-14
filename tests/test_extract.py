@@ -1,3 +1,5 @@
+import datetime
+
 import pytest
 from cotrainer import extract
 
@@ -99,3 +101,27 @@ def test_find_club_record_prefers_exact_pair_with_finances(monkeypatch):
     assert r['short'] == 'NK Osijek' and r['end'] > 200
     assert extract.find_club_record(db, 'Gibt es nicht', 'X') is None
     assert extract.find_club_record(db, 'nk osijek', 'NK Osijek') is None
+
+
+def test_map_ratings_by_name_and_birthdate():
+    d1, d2 = datetime.date(2000, 1, 1), datetime.date(1999, 2, 2)
+    old = {101: {'name': 'Nicolas Viola', 'dob': d1}, 102: {'name': 'Ohne Treffer', 'dob': d2}}
+    new = {7: {'name': 'nicolas viola ', 'dob': d1}, 8: {'name': 'Anders Geschrieben', 'dob': d2}}
+    assert extract.map_ratings({101: (6.8, 7.1), 102: (6.0, 6.2)}, old, new) == {7: (6.8, 7.1)}
+
+
+@pytest.mark.save
+def test_osijek_reads_first_team_from_fmsave(osijek_save):
+    data = extract.analyse(osijek_save)
+    m = data["meta"]
+    assert m["source"] == "fmsave" and m["club"] == "NK Osijek" and m["manager"] == "Ivan Kurasic"
+    assert m["league"] == "First League" and len(m["rivals"]) == 9
+    assert 20 <= len(data["squad"]) <= 30 and len(data["pool"]) > 1000
+
+
+@pytest.mark.save
+def test_ravenna_reads_first_team_from_fmsave(ravenna_data):
+    m = ravenna_data["meta"]
+    assert m["source"] == "fmsave" and m["league"] == "Serie C/B"
+    assert 24 <= len(ravenna_data["squad"]) <= 28                    # 27 in der ersten Mannschaft
+    assert sum(1 for p in ravenna_data["squad"] if p.get("tr")) >= 20  # Bewertungen zugeordnet
