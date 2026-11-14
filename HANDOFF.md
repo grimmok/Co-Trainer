@@ -285,6 +285,8 @@ Grundlage: `Trainertest 2.fm` (unverändert) gegen `Trainertest 2 traainer.fm` (
 ## Offene Probleme
 
 - **Paris-Spielstand ohne eigene Taktik:** In `tactics_man` stehen nur Formationsvorlagen. Das Programm nimmt dann die Standardformation 4-2-3-1 (`default_tactic`), ein Konsolenlauf mit `config.json` die Taktik von dort. Warum das so ist, ist ungeklärt.
+- **Spielstände ohne gefundenen Kader:** Bei Nationaltrainer-Karrieren (Südkorea 2028, Curaçao) und bei zwei menschlichen Managern (`Trainertest .fm`) findet der Leser keinen eigenen Kader; das Programm meldet das im Klartext (`require_squad`). Bei den alten Karrieren greifen außerdem die Muster für Scoutinggebiet und teils Trainerwerte nicht.
+- **Fester Port 47127** für die Oberfläche (`UI_PORT` in `app.py`): Ist er belegt, vergisst das Programm für diesen Lauf Rollenwahl, Filter und sichtbare Bereiche.
 - **Nur 19 Rollen bekannt:** Bekannt sind nur die Rollen der aktuellen Taktik. Alle anderen erscheinen als „?“ mit Standardrolle. Der Rollentest läuft, siehe „Nächste Schritte“.
 - **Zuordnung ZOM-Rolle unsicher:** Für die Rolle mit Ball am ZOM (Kürzel „F“) ist „Freie Rolle“ angenommen. Der genaue FM27-Name ist unbestätigt (in `lang_db` fehlen u. a. die IDs 1810, 1826, 1828–1833, 1848, 1870).
 - **Unbekannter Einfluss der Spieleranweisungen:** Ob individuelle Spieleranweisungen die Unterblöcke verändern und damit den Fingerabdruck brechen, ist ungeprüft.
@@ -303,18 +305,32 @@ Grundlage: `Trainertest 2.fm` (unverändert) gegen `Trainertest 2 traainer.fm` (
 
 Stand 14.11.: **Teil 1 ist gebaut** (acht Tasks des Plans, Branch `programm-entwurf`), siehe „Was bisher gemacht wurde“ Punkt 15.
 
-1. **Nutzer probiert `dist\Co-Trainer.exe` aus** (bauen mit `.\build.ps1`): einmal ganz durchklicken bis zum Ergebnis, auch mit dem Paris-Spielstand (ohne eigene Taktik) und einem alten Spielstand (China 2028). Windows zeigt beim ersten Start „Der Computer wurde durch Windows geschützt“, weil die `.exe` nicht signiert ist.
-2. **Branch `programm-entwurf` nach `main` übernehmen**, wenn der Nutzer zufrieden ist.
-3. **Danach je einen Plan schreiben und bauen:**
+1. **Nutzer probiert `dist\Co-Trainer.exe` aus** (liegt gebaut vor; neu bauen mit `.\build.ps1`). Das ist der einzige ungeprüfte Teil von Teil 1: Aus der `.exe` heraus hat noch niemand bis zum Ergebnis durchgeklickt. Zu prüfen:
+   - erster Start zeigt Schritt 1 mit dem vorgeschlagenen Ordner (die echten Einstellungen in `%APPDATA%\Co-Trainer` sind noch nicht angelegt);
+   - Ravenna bis zum Ergebnis, alle fünf Bereiche, Häkchen, „Hell/Dunkel“, „Neu einlesen“, „Spielstand wechseln…“;
+   - Paris FC (ohne eigene Taktik → Standardformation 4-2-3-1);
+   - ein Nationaltrainer-Spielstand (Südkorea 2028 oder Curaçao) → erwartet ist die Meldung „kein Kader des eigenen Vereins gefunden“ mit „Anderen Spielstand wählen…“;
+   - Programm schließen und neu starten: Schritt 1 entfällt, Farbschema bleibt.
+   - Windows zeigt beim ersten Start „Der Computer wurde durch Windows geschützt“, weil die `.exe` nicht signiert ist.
+2. **Unabhängige Durchsicht des Codes** (z. B. `/code-review`): Die Abschlussprüfung von Teil 1 hat Claude selbst gemacht, ohne zweiten Prüfer.
+3. **Branch `programm-entwurf` nach `main` übernehmen**, wenn der Nutzer zufrieden ist (bisher nichts gepusht, kein PR).
+4. **Zurückgestellte Kleinigkeiten aus Teil 1** (nur auf Wunsch des Nutzers):
+   - Rollenbeschriftungen auf dem Spielfeld überlappen bei benachbarten Spielern (war schon in der alten Seite so).
+   - `app.main` zeigt die WebView2-Meldung bei jedem Startfehler, auch bei einem anderen.
+   - Die nachgestellte `Api` des Entwicklermodus (`?dev=1`, rund 12 Zeilen) wird mit ausgeliefert.
+   - Alte Spielstände (China 2028) brauchen rund 160 s; es gibt keinen Zwischenspeicher.
+   - Die Wahl aus Schritt 3 überschreibt bei jedem Start die gemerkten sichtbaren Bereiche (so im Plan; ggf. die letzte Wahl vorbelegen).
+5. **Danach je einen Plan schreiben und bauen** (Skill `superpowers:writing-plans`, dann `superpowers:executing-plans`):
    - Teil 2: fmsave als Datenquelle, Kader nur erste Mannschaft, Nationalität, Scoutinggebiet als Filter, drei Informationsstufen der Transfervorschläge.
    - Teil 3: neuer Taktik-Reiter (Schwachstellen, Verursacher, Abhilfe), Trainerbewertungen als Textstufen, Auswahl der Trainertendenzen pro Karriere, Trainingsfokus.
    - Teil 4: README, Lizenzhinweise, GitHub-Release.
-4. **Für Teil 2 noch zu dekodieren:**
+   - Für den Plan von Teil 2 zu klären: ob fmsave die Spielstände ohne gefundenen Kader löst (Nationaltrainer, zwei Manager) und wie fmsave (Python ≥ 3.12, feste Version) in die `.exe` gepackt wird.
+6. **Für Teil 2 noch zu dekodieren:**
    - Ligastufe je Wettbewerb (für „Angrenzende Ligen“ = eigene Spielklasse ± 1 im selben Land).
    - Die 56 Länder ohne deutschen Namen (Regex für `lang_db.dat`, Frame 64, ist zu eng).
    - Nationentabelle (Kontinent, Region) in den Leser übernehmen; bisher nur im Scratchpad erkundet.
    - Optional: welche Spieler den Mitarbeitern bekannt sind (für „Kein Scouting“; bis dahin gilt die Regel „vertragslose Spieler der Vereinsnation“).
-5. **Vom Nutzer zu bestätigen, wenn es sich ergibt:**
+7. **Vom Nutzer zu bestätigen, wenn es sich ergibt:**
    - ob bei „Angrenzende Ligen“ alle Serie-C-Staffeln gemeint sind (Annahme Claude: ja);
    - Stil-Code `TREV` = Vertikales Tiki-Taka;
    - Stufengrenzen der Trainerbewertungen unterhalb von 18 (bisher nur aus Profil-Screenshots abgeleitet);
