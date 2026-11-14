@@ -109,3 +109,9 @@ def test_second_analyse_is_rejected_while_running(api, monkeypatch):    # Review
     assert api.analyse("x.fm") == {"started": False, "error": "Es wird bereits ein Spielstand eingelesen."}
     gate.set(); api.join()
     assert sum(c.startswith("CT.onResult(") for c in api._window.calls) == 1
+
+
+def test_set_title_changes_the_window_title(api):
+    api._window.set_title = lambda t: api._window.calls.append("title:" + t)
+    assert api.set_title("Co-Trainer · Ravenna · Serie C/B") == {"ok": True}
+    assert api._window.calls[-1] == "title:Co-Trainer · Ravenna · Serie C/B"

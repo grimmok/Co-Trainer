@@ -299,7 +299,8 @@ function start(data,pick){
 function render(){
  if(!DATA)return;
  const m=DATA.meta,f=m.finances||{};
- document.title='Co-Trainer · '+(m.club_short||m.club)+(m.league?' · '+m.league:'');
+ const title='Co-Trainer · '+(m.club_short||m.club)+(m.league?' · '+m.league:'');
+ if(document.title!==title){document.title=title;if(API&&API.set_title)API.set_title(title);}
  document.getElementById('chip').innerHTML=`<span><b>${esc(m.club_short||m.club)}</b>${m.league?' · '+esc(m.league):''}</span><span>Transferbudget <b>${money(f.transfer_budget)}</b></span><span>Stand <b>${dDate(m.date)}</b></span>`;
  document.getElementById('side').innerHTML=`<h3>Anzeigen</h3>${SECTIONS.map(([k,l])=>`<label><input type="checkbox" ${S.visible.includes(k)?'checked':''} onchange="toggleSec('${k}',this.checked)">${l}</label>`).join('')}
  <hr><button class="lnk" onclick="switchSave()">Spielstand wechseln…</button><button class="lnk" onclick="reread()">Neu einlesen</button>

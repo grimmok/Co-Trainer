@@ -89,6 +89,11 @@ class Api:
         self._save_settings()
         return dict(ok=True)
 
+    def set_title(self, title):
+        """Fenstertitel, z. B. „Co-Trainer · Ravenna · Serie C/B“."""
+        self._window.set_title(str(title)[:120])
+        return dict(ok=True)
+
     def set_game_dir(self, path):
         if not path or not os.path.isdir(path) or not _lang_db_in(path):
             return dict(ok=False, error='In diesem Ordner wurde die Sprachdatenbank des Spiels nicht gefunden.')
