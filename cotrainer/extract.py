@@ -40,15 +40,10 @@ def log(*a):
 
 
 # ---------------------------------------------------------------- Dateien finden
-SKIP_SAVE = re.compile(r'backup|auto ?save|autosave', re.I)
-
-
 def list_saves():
-    """Eigene Spielstände, neueste zuerst. Sicherungen (z. B. 'last save overwrite backup.fm') werden ausgelassen."""
-    docs = os.path.join(os.path.expanduser('~'), 'Documents', 'Sports Interactive')
-    cands = glob.glob(os.path.join(docs, 'Football Manager*', 'games', '*.fm'))
-    cands = [c for c in cands if not SKIP_SAVE.search(os.path.basename(c))]
-    return sorted(cands, key=os.path.getmtime, reverse=True)
+    """Pfade der eigenen Spielstände, neueste zuerst (Sicherungen ausgelassen), aus dem üblichen Spielstand-Ordner."""
+    from . import saves                 # erst hier, weil saves dieses Modul einbindet
+    return [x.path for x in saves.list_saves(saves.default_saves_dir())]
 
 
 def find_save(arg):
