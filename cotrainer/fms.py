@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 
 import fmsave
 
-from .extract import ATTR_KEYS, POS_KEYS, CUP_WORDS, log
+from .extract import ATTR_KEYS, POS_KEYS, CUP_WORDS, GBP_TO_EUR, log
 
 # fmsave-Feldnamen in der Reihenfolge von ATTR_KEYS (ohne Füße, die kommen hinter 'technique')
 _ATTR_FIELDS = [
@@ -76,6 +76,12 @@ def comps_from_fixtures(fixtures, comp_db, cnames):
     return comps
 
 
+def contract_record(c):
+    """Vertrag: Wochengehalt von GBP nach EUR, Ende als ISO-Text."""
+    return dict(wage_week=None if c.wage is None else round(c.wage * GBP_TO_EUR),
+                end=c.end.isoformat() if c.end else None)
+
+
 def pick_own_club(managed, club_name):
     for m in managed:
         if club_name in (m.club_name, m.club_short_name):
@@ -100,9 +106,7 @@ def read(path, cnames, club_name):
                         continue
                     players[p.uid] = r
                     if p.contract is not None:
-                        end = p.contract.end
-                        contracts[p.uid] = dict(wage_week=p.contract.wage,
-                                                end=end.isoformat() if end else None)
+                        contracts[p.uid] = contract_record(p.contract)
                 clubs = {c.uid: dict(name=c.name, short=c.short_name or c.name) for c in s.clubs()}
                 comp_db = {c.id: c.database_id for c in s.competitions()}
                 comps = comps_from_fixtures(s.fixtures(), comp_db, cnames)

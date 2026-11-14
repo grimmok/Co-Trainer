@@ -63,3 +63,7 @@ def test_read_returns_none_without_managed_club(monkeypatch):
         def managed_clubs(self): return []
     monkeypatch.setattr(fms.fmsave, 'open', lambda path: Save())
     assert fms.read('x.fm', {}, 'X') is None
+
+def test_contract_record_converts_wage_to_eur():
+    assert fms.contract_record(NS(wage=4008, end=datetime.date(2027, 6, 30))) == {'wage_week': 4666, 'end': '2027-06-30'}
+    assert fms.contract_record(NS(wage=None, end=None)) == {'wage_week': None, 'end': None}
