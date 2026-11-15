@@ -30,7 +30,8 @@
     return AREAS.map(area => {
       const slots = [];
       for (const s of lineup) {
-        if (!s.player || !area.pos.includes(s.pos)) continue;
+        const pos = area.phase === 'oop' ? (s.op || s.pos) : s.pos;
+        if (!s.player || !area.pos.includes(pos)) continue;
         const role = (roles || {})[s[area.phase]];
         const val = slotValue(area, s.player, role);
         if (val === null) continue;
@@ -41,7 +42,7 @@
       const causers = slots.filter(x => x.val < MITTEL)
         .sort((x, y) => x.val - y.val).slice(0, 3)
         .map(({s, role, val}) => ({
-          i: s.i, id: s.player.id, n: s.player.n, pos: s.pos, role: role ? role.name : '',
+          i: s.i, id: s.player.id, n: s.player.n, pos: area.phase === 'oop' ? (s.op || s.pos) : s.pos, role: role ? role.name : '',
           avg: Math.round(val * 10) / 10,
           weak: area.attrs.filter(k => s.player.a[k] !== undefined && s.player.a[k] !== null && s.player.a[k] < MITTEL)
             .map(k => [k, s.player.a[k]]).sort((x, y) => x[1] - y[1]),
@@ -58,11 +59,12 @@
       const v = ((r && r.key) || []).map(k => player.a && player.a[k]).filter(x => x !== undefined && x !== null);
       return v.length ? v.reduce((t, x) => t + x, 0) / v.length : null;
     };
+    const slotPos = area.phase === 'oop' ? (slot.op || slot.pos) : slot.pos;
     const curId = slot[area.phase], cur = (roles || {})[curId];
     const curMean = mean(cur);
     let best = null, bestMean = null;
     for (const [id, r] of Object.entries(roles || {})) {
-      if (id === curId || !r.pos.includes(slot.pos) || !(r.ph === area.phase || r.ph === 'both')) continue;
+      if (id === curId || !r.pos.includes(slotPos) || !(r.ph === area.phase || r.ph === 'both')) continue;
       const m = mean(r);
       if (m !== null && (bestMean === null || m > bestMean)) { best = {id, r}; bestMean = m; }
     }
@@ -107,21 +109,46 @@
     const out = {};
     for (const g of Object.keys(LEAD_MAX)) {
       const ok = LEADERSHIP[g].map(c => c.key), seen = [];
-      for (const k of ((sel && sel[g]) || [])) if (ok.includes(k) && !seen.includes(k)) seen.push(k);
+      for (const k of (Array.isArray(sel && sel[g]) ? sel[g] : [])) if (ok.includes(k) && !seen.includes(k)) seen.push(k);
       out[g] = seen.slice(0, LEAD_MAX[g]);
     }
     return out;
   }
 
-  function coachHints(coaching, rated) {
+  // Baustellen: schwache Bereiche plus Bereiche mit Verursachern, die mindestens 0,3 unter dem Schnitt aller Bereiche liegen.
+  function focusAreas(rated) {
+    const list = (rated || []).filter(a => a.avg !== null && a.avg !== undefined);
+    const mean = list.length ? list.reduce((t, a) => t + a.avg, 0) / list.length : 0;
+    return list.filter(a => a.band === 'schwach' || ((a.causers || []).length > 0 && a.avg <= mean - 0.3 + 1e-9))
+      .sort((x, y) => x.avg - y.avg).map(a => a.key);
+  }
+
+  function coachHints(coaching, rated, focusKeys) {
     const out = [], c = coaching || {};
     for (const a of rated || []) {
-      if (a.band !== 'schwach') continue;
+      if (focusKeys ? !focusKeys.includes(a.key) : a.band !== 'schwach') continue;
       for (const r of a.coach || []) {
         if (c[r] !== 'Sehr schlecht' && c[r] !== 'Schlecht') continue;
-        const t = '„' + a.name + '“ ist schwach, und deine Trainerbewertung ' + r + ' ist „' + c[r] + '“ – einen Co-Trainer mit Stärke in ' + r + ' diese Einheit leiten lassen.';
+        const t = '„' + a.name + '“ ist ' + (focusKeys ? 'eine Baustelle' : 'schwach') + ', und deine Trainerbewertung ' + r + ' ist „' + c[r] + '“ – einen Co-Trainer mit Stärke in ' + r + ' diese Einheit leiten lassen.';
         if (!out.includes(t)) out.push(t);
       }
+    }
+    return out;
+  }
+
+  const TACTIC_NEEDS = {
+    possession: ['Ballbesitz', 'Techniken', 'Taktik', 'Fitness'],
+    pressing: ['Fitness', 'Defensive', 'Taktik'],
+    counter: ['Offensive', 'Fitness', 'Defensive'],
+    wide: ['Offensive', 'Techniken', 'Fitness'],
+    direct: ['Fitness', 'Standardsituationen', 'Offensive'],
+  };
+  const CA_ALIAS = {Athletik: 'Fitness', Fitness: 'Athletik', Standards: 'Standardsituationen', Standardsituationen: 'Standards'};
+  function tacticCoachGaps(coaching, family) {
+    const c = coaching || {}, out = [];
+    for (const n of TACTIC_NEEDS[family] || []) {
+      const v = c[n] !== undefined ? c[n] : c[CA_ALIAS[n]];
+      if (v === 'Sehr schlecht' || v === 'Schlecht') out.push([n, v]);
     }
     return out;
   }
@@ -149,7 +176,7 @@
     return out;
   }
 
-  const api = {AREAS, areaRatings, helpFor, LEADERSHIP, LEAD_MAX, cleanLead, coachHints, leadHints};
+  const api = {AREAS, areaRatings, helpFor, LEADERSHIP, LEAD_MAX, cleanLead, focusAreas, coachHints, tacticCoachGaps, leadHints};
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.TAKTIK = api;
 })(this);

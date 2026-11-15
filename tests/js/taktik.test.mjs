@@ -87,3 +87,67 @@ test('leadHints: Konflikt, Passung, Alter', () => {
   assert.equal(y[0].text, 'Deine Startelf ist im Schnitt 28,4 Jahre alt – mehr junge Spieler einbauen passt zu deinem Ruf.');
   assert.deepEqual(T.leadHints(sel([]), {family:'pressing',styleKey:'gegenpress',avgAge:30}), []);
 });
+
+// ---- Korrekturrunde ----
+const R = (key, avg, n, band) => ({key, name:key, avg, band: band === undefined ? (avg === null ? null : avg >= 13 ? 'gut' : avg >= 11 ? 'mittel' : 'schwach') : band,
+  causers: Array.from({length:n}, (_, i) => ({i, id:i})), coach:['Fitness']});
+test('focusAreas: alles schwach, alle mit Verursachern drin, aufsteigend', () => {
+  const r = [R('a',9.5,2), R('b',8.0,1), R('c',10.0,3)];
+  assert.deepEqual(T.focusAreas(r), ['b','a','c']);
+});
+test('focusAreas: Ravenna-ähnlich, nur Bereiche mit Verursachern und avg <= Mittel - 0,3', () => {
+  const r = [R('a',11.4,2), R('b',11.6,1), R('c',12.2,1), R('d',12.0,0), R('e',12.2,0), R('f',12.2,0), R('g',12.0,0), R('h',12.2,0)];
+  assert.deepEqual(T.focusAreas(r), ['a','b']);
+});
+test('focusAreas: Bereich ohne Verursacher nie drin, auch wenn tief', () => {
+  const r = [R('a',11.0,0), R('b',13.0,1), R('c',13.5,1)];
+  assert.deepEqual(T.focusAreas(r), []);
+});
+test('focusAreas: Bereiche ohne avg werden ignoriert', () => {
+  const r = [R('a',null,0), R('b',11.0,1), R('c',12.5,1)];
+  assert.deepEqual(T.focusAreas(r), ['b']);
+  assert.deepEqual(T.focusAreas([]), []);
+});
+test('coachHints mit focusKeys: Baustelle statt schwach', () => {
+  const rated = [{key:'intens',name:'Pressingintensität',band:'mittel',coach:['Fitness','Defensive']}];
+  assert.deepEqual(T.coachHints({Fitness:'Schlecht'}, rated), []);
+  assert.deepEqual(T.coachHints({Fitness:'Schlecht'}, rated, ['intens']),
+    ['„Pressingintensität“ ist eine Baustelle, und deine Trainerbewertung Fitness ist „Schlecht“ – einen Co-Trainer mit Stärke in Fitness diese Einheit leiten lassen.']);
+  assert.deepEqual(T.coachHints({Fitness:'Schlecht'}, rated, []), []);
+});
+test('tacticCoachGaps: nur Schlecht und Sehr schlecht in den Bereichen des Spielstils', () => {
+  assert.deepEqual(T.tacticCoachGaps({Fitness:'Schlecht', Defensive:'Gut', Taktik:'Durchschnitt'}, 'pressing'), [['Fitness','Schlecht']]);
+  assert.deepEqual(T.tacticCoachGaps({}, 'pressing'), []);
+  assert.deepEqual(T.tacticCoachGaps({Athletik:'Sehr schlecht'}, 'direct'), [['Fitness','Sehr schlecht']]);
+  assert.deepEqual(T.tacticCoachGaps({Fitness:'Schlecht'}, 'gibtsnicht'), []);
+});
+test('cleanLead robust gegen Nicht-Arrays', () => {
+  assert.deepEqual(T.cleanLead({training:5, mental:{}}), {training:[], mental:[]});
+  assert.deepEqual(T.cleanLead('x'), {training:[], mental:[]});
+  assert.deepEqual(T.cleanLead(null), {training:[], mental:[]});
+});
+test('areaRatings: ip-Bereiche nutzen die ip-Rolle, auch wenn oop anders ist', () => {
+  const a = {...all(8), Pas:20, Vis:20, Dec:20};
+  const r = T.areaRatings([{i:0,pos:'DC',ip:'bpcb',oop:'cb',player:pl(1,a)}], ROLES).find(x=>x.key==='pass');
+  // Pas,Vis doppelt (bpcb): (40+40+8+8)/6 = 16
+  assert.equal(r.avg, 16);
+});
+test('areaRatings: oop-Bereiche nutzen die Position gegen den Ball', () => {
+  const lu = [{i:0,pos:'MC',op:'DM',ip:'cm',oop:'pcm',player:pl(1,all(8))}];
+  const r = T.areaRatings(lu, ROLES);
+  const linie = r.find(x=>x.key==='linie');
+  assert.equal(linie.causers.length, 1); assert.equal(linie.causers[0].pos, 'DM');
+  // ip-Bereich Chancen kreieren zählt MC über die normale Position
+  assert.equal(r.find(x=>x.key==='chancen').causers[0].pos, 'MC');
+  // ohne op bleibt pos maßgeblich: MC ist nicht in der Pressinglinie
+  const r2 = T.areaRatings([{i:0,pos:'MC',ip:'cm',oop:'pcm',player:pl(1,all(8))}], ROLES);
+  assert.equal(r2.find(x=>x.key==='linie').causers.length, 0);
+});
+test('helpFor: oop-Rollenkandidaten nach der Position gegen den Ball', () => {
+  const R2 = {...ROLES, dm:{name:'Sechser',ph:'oop',pos:['DM'],key:['Pos','Dec','Mar']}};
+  const a = {...all(8), Pos:16, Dec:16, Mar:16};
+  const slot = {i:0,pos:'MC',op:'DM',ip:'cm',oop:'pcm'};
+  const area = T.areaRatings([{...slot,player:pl(1,a)}], R2).find(x=>x.key==='linie');
+  const h = T.helpFor(area, area.causers[0], pl(1,a), slot, R2);
+  assert.equal(h[0].kind, 'rolle'); assert.equal(h[0].role, 'dm');
+});

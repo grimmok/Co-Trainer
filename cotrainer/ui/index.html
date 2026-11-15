@@ -416,7 +416,7 @@ function vTransfer(){const sl=slots(),aus=W.info==='aus',m=DATA.meta,sk=sortKey(
  <label class="f">Min. Wechselchance %<input type="number" value="${S.f.will}" style="width:90px" onchange="S.f.will=+this.value;save();renderSug()"></label>
  <label class="f">Sortierung<select onchange="S.f.sort=this.value;save();renderSug()">${(aus?SORTS.aus:SORTS.full).map(([k,l])=>`<option value="${k}" ${sk===k?'selected':''}>${l}</option>`).join('')}</select></label>
  ${aus?'':`<label class="f" style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" ${S.f.budget?'checked':''} onchange="S.f.budget=this.checked;save();renderSug()"> im Transferbudget</label>`}
- ${weakIdx().length?`<label class="f" style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" ${S.f.weak?'checked':''} onchange="S.f.weak=this.checked;save();renderSug()"> Nur Positionen mit Taktik-Schwachstellen</label>`:''}
+ ${weakIdx().length?`<label class="f" style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" ${S.f.weak?'checked':''} onchange="S.f.weak=this.checked;save();renderSug()"> Nur Positionen mit Taktik-Baustellen</label>`:''}
  <label class="f" style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" ${S.f.free?'checked':''} onchange="S.f.free=this.checked;save();renderSug()"> nur ablösefrei/ auslaufend</label>
  ${m.scout_outside?`<label class="f" style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="fout" ${outOn?'checked':''} onchange="setOutside(this)"> Auch außerhalb meines Scoutinggebiets suchen</label>`:''}</div>
  ${area?`<p class="muted" style="margin:-4px 0 10px">${area}</p>`:''}
@@ -432,12 +432,12 @@ function mixLeagues(rows,n){const left=rows.slice(),cnt={},out=[];
   const x=left.splice(bi,1)[0];const g=lgGroup(x.p);cnt[g]=(cnt[g]||0)+1;out.push(x);}
  return out;}
 /* Stufe „Aus“: nur sichtbare Spieler (p.vis), Positionen ≥ 15, eigene Startelf (an.assign) für die schwächsten Plätze */
-/* Plätze (Platzindex i) der Verursacher schwacher Bereiche; Bereich je Platz = der erste schwache */
-function weakSlots(an){const m=new Map();for(const a of areas(an||analyze()))if(a.band==='schwach')for(const c of a.causers)if(!m.has(c.i))m.set(c.i,a.name);return m;}
+/* Plätze (Platzindex i) der Verursacher der Baustellen; Bereich je Platz = die erste Baustelle */
+function weakSlots(an){const m=new Map();an=an||analyze();const F=focus(an);for(const a of areas(an))if(F.has(a.key))for(const c of a.causers)if(!m.has(c.i))m.set(c.i,a.name);return m;}
 function weakIdx(){return[...weakSlots()].map(x=>x[0]);}
 function idxFor(sl,an){let idx=S.f.pos===''?sl.map((_,i)=>i):[+S.f.pos];
  if(S.f.weak&&weakIdx().length){const w=weakSlots(an);idx=idx.filter(i=>w.has(i));}return idx;}
-const NOWEAK='<div class="muted" style="padding:30px;text-align:center">Keine Schwachstellen-Position passt zum Positionsfilter.</div>';
+const NOWEAK='<div class="muted" style="padding:30px;text-align:center">Keine Baustellen-Position passt zum Positionsfilter.</div>';
 function renderSugAus(el,an){const sl=an.sl,ws=weakSlots(an);
  const order=sl.map((s,i)=>[i,an.assign[i]?an.assign[i].sc:0]).sort((a,b)=>a[1]-b[1]).map(x=>x[0]);
  const weak=sl[order[0]],weak3=new Set(order.slice(0,3).map(i=>sl[i].pos));
@@ -448,7 +448,7 @@ function renderSugAus(el,an){const sl=an.sl,ws=weakSlots(an);
   const plW=posRating(p,weak.pos)>=15,pl3=[...weak3].some(x=>posRating(p,x)>=15),free=!p.club,left=daysLeft(p),ending=!free&&left!=null&&left<=365;
   const rec=(plW?40:pl3?15:0)+(free?8:0)+(p.near_league?10:0)+(ending?15:0)+0.3*(p.will||0)+(p.age<=21?5:0);
   const why=[];if(plW)why.push(`Spielt ${PDE[weak.pos]} – dort ist deine schwächste Position`);
-  const wi=[...ws.keys()].find(i=>posRating(p,sl[i].pos)>=15);if(wi!=null)why.push(`Spielt ${PDE[sl[wi].pos]} – dort liegt die Schwachstelle „${ws.get(wi)}“`);if(p.near_league)why.push('Spielt in einer Liga deines Niveaus');if(free)why.push('Vereinslos – ablösefrei');
+  const wi=[...ws.keys()].find(i=>posRating(p,sl[i].pos)>=15);if(wi!=null&&!(plW&&sl[wi].pos===weak.pos))why.push(`Spielt ${PDE[sl[wi].pos]} – dort liegt die Baustelle „${ws.get(wi)}“`);if(p.near_league)why.push('Spielt in einer Liga deines Niveaus');if(free)why.push('Vereinslos – ablösefrei');
   if(ending)why.push(`Vertrag läuft ${mmyyyy(p.end)} aus`);if(p.weaker_league)why.push('Kommt aus einer schwächeren Liga – Wechsel wahrscheinlich');
   if(p.age<=21)why.push(`Jung (${p.age}) – Platz zum Entwickeln`);
   rows.push({p,rec,why:why.slice(0,2),i:idx.find(i=>posRating(p,sl[i].pos)>=15)});}
@@ -514,26 +514,30 @@ function closeDrawer(){document.body.classList.remove('dr');}
 const BAND={'Sehr schlecht':1,'Schlecht':2,'Durchschnitt':3,'Gut':4,'Sehr gut':5,'Herausragend':6,'Elite':6};
 const CA_ALIAS={Athletik:'Fitness',Fitness:'Athletik',Standards:'Standardsituationen',Standardsituationen:'Standards'};
 const cav=(ca,k)=>ca[k]??ca[CA_ALIAS[k]];
-function lineup(an){return an.sl.map((s,i)=>({i,pos:s.pos,ip:s.ip,oop:s.oop,player:(an.assign[i]&&an.assign[i].p)||null}));}
+function lineup(an){return an.sl.map((s,i)=>({i,pos:s.pos,ip:s.ip,oop:s.oop,op:s.op,player:(an.assign[i]&&an.assign[i].p)||null}));}
 function areas(an){return TAKTIK.areaRatings(lineup(an),ROLES);}
+function focus(an){return new Set(TAKTIK.focusAreas(areas(an)));}
 function applyRole(i,ph,id){setRole(i,ph==='ip'?0:1,id);WCACHE.clear();}
 function seeTransfers(i){S.f.pos=String(i);save();showSection('transfer');}
-function areaCard(an){const A=areas(an);
+function areaCard(an){const A=areas(an),F=focus(an);
  const pill=b=>b==='gut'?'<span class="pill g">gut</span>':b==='mittel'?'<span class="pill">mittel</span>':b==='schwach'?'<span class="pill b">schwach</span>':'<span class="pill">nicht bewertbar</span>';
  const help=(a,c)=>{const sl=an.sl[c.i],pl=an.assign[c.i]&&an.assign[c.i].p;if(!pl)return'';
   return`<ul class="tips">${TAKTIK.helpFor(a,c,pl,sl,ROLES,AN).map(h=>`<li>${esc(h.text)}${h.kind==='rolle'?` <button class="btn" onclick="applyRole(${c.i},'${a.phase}','${h.role}')">Übernehmen</button>`:h.kind==='transfer'?` <button class="btn" onclick="seeTransfers(${c.i})">Ansehen</button>`:''}</li>`).join('')}</ul>`;};
+ const who=a=>a.causers.map(c=>`<div style="margin-bottom:10px"><a onclick="openPlayer(${c.id})"><b>${esc(c.n)}</b></a> <span class="psub">${esc(PDE[c.pos]||c.pos)} · ${esc(c.role)}${c.weak.length?' · schwach: '+c.weak.map(([k,v])=>esc(AN[k]||k)+' '+v).join(', '):''}</span>${help(a,c)}</div>`).join('');
  return`<div class="card"><h2>Taktische Bereiche</h2><table class="tbl"><tbody>
- ${A.map(a=>`<tr><td><b>${esc(a.name)}</b><div class="psub">${a.phase==='ip'?'mit Ball':'gegen den Ball'}</div></td><td class="num"><b>${a.avg===null?'–':a.avg.toFixed(1)}</b></td><td>${pill(a.band)}</td></tr>
- ${a.band==='schwach'?`<tr><td colspan="3">${a.causers.map(c=>`<div style="margin-bottom:10px"><a onclick="openPlayer(${c.id})"><b>${esc(c.n)}</b></a> <span class="psub">${esc(PDE[c.pos]||c.pos)} · ${esc(c.role)}${c.weak.length?' · schwach: '+c.weak.map(([k,v])=>esc(AN[k]||k)+' '+v).join(', '):''}</span>${help(a,c)}</div>`).join('')}</td></tr>`:''}`).join('')}</tbody></table>
- <p class="note">Einschätzung aus den Attributen deiner Startelf in den Rollen der Taktik (1–20; Schlüsselattribute der Rolle zählen doppelt). Gut ab 13, mittel ab 11.</p></div>`;}
-const PILL_OF=v=>{const n=BAND[v];return n<=2?'pill b':n===3?'pill':n===4?'pill a':'pill g';};
+ ${A.map(a=>{const fo=F.has(a.key);return`<tr><td><b>${esc(a.name)}</b><div class="psub">${a.phase==='ip'?'mit Ball':'gegen den Ball'}</div></td><td class="num"><b>${a.avg===null?'–':a.avg.toFixed(1).replace('.',',')}</b></td><td>${pill(a.band)}${fo&&a.band!=='schwach'?' <span class="pill w">Baustelle</span>':''}</td></tr>
+ ${a.causers.length?`<tr><td colspan="3">${fo?who(a):`<details><summary class="psub">Wer zieht den Wert runter? (${a.causers.length})</summary>${who(a)}</details>`}</td></tr>`:''}`;}).join('')}</tbody></table>
+ <p class="note">Einschätzung aus den Attributen deiner Startelf in den Rollen der Taktik (1–20; Schlüsselattribute der Rolle zählen doppelt; gegen den Ball zählt die Position gegen den Ball). Gut ab 13, mittel ab 11. Baustelle = Bereich mit Spielern unter 11, der mindestens 0,3 unter dem Schnitt deiner Bereiche liegt.</p></div>`;}
+const PILL_OF=v=>{const n=BAND[v];return n===undefined?'pill':n<=2?'pill b':n===3?'pill':n===4?'pill a':'pill g';};
 function toggleLead(g,k){const l=S.lead[g],i=l.indexOf(k);if(i>=0)l.splice(i,1);else{l.push(k);if(l.length>TAKTIK.LEAD_MAX[g])l.shift();}save();render();}
 function coachCard(an){const c=DATA.coach||{},ca=c.coaching||{},cm=c.mental||{};const has=Object.keys(ca).length||Object.keys(cm).length;
  const col=(t,o)=>`<div><h3 class="psub">${t}</h3><table class="tbl"><tbody>${Object.entries(o).map(([k,v])=>`<tr><td>${esc(k)}</td><td class="num"><span class="${PILL_OF(v)}">${esc(v)}</span></td></tr>`).join('')}</tbody></table></div>`;
- const hints=TAKTIK.coachHints(ca,areas(an));
+ const hints=TAKTIK.coachHints(ca,areas(an),[...focus(an)]);
+ const gaps=TAKTIK.tacticCoachGaps(ca,STYLES[S.style].family);
+ if(gaps.length)hints.push('Coaching-Lücken für „'+STYLES[S.style].name+'“: '+gaps.map(([n,v])=>n+' („'+v+'“)').join(', ')+' – Co-Trainer mit Stärken in genau diesen Bereichen einstellen und die passenden Einheiten leiten lassen.');
  if(BAND[cm['Motivationsfähigkeit']]<=2)hints.push('Motivationsfähigkeit schwach → Teamansprachen eher ruhig/ermutigend halten, einen Co-Trainer mit guter Motivation einstellen.');
- if(BAND[cm['Autorität']]>=4&&BAND[cm['Autorität']]<6)hints.push('Gute Autorität → strenge Disziplin und klare Vorgaben werden von der Mannschaft akzeptiert.');
- if(BAND[cm['Autorität']]>=6)hints.push('Autorität „Elite“ → strikte Vorgaben, Geldstrafen und klare Rollen funktionieren sehr gut.');
+ if(BAND[cm['Autorität']]>=4&&BAND[cm['Autorität']]<6)hints.push('Autorität „'+cm['Autorität']+'“ → strenge Disziplin und klare Vorgaben werden von der Mannschaft akzeptiert.');
+ if(BAND[cm['Autorität']]>=6)hints.push('Autorität „'+cm['Autorität']+'“ → strikte Vorgaben, Geldstrafen und klare Rollen funktionieren sehr gut.');
  const L=S.lead,box=(g,cd)=>`<div class="lead${L[g].includes(cd.key)?' on':''}" onclick="toggleLead('${g}','${cd.key}')"><b>${esc(cd.name)}</b><div class="psub">${esc(cd.desc)}</div><div class="psub">${esc(cd.tendency)}${cd.sure?'':' (Zuordnung vermutet)'}</div></div>`;
  const sel=[...L.training.map(k=>TAKTIK.LEADERSHIP.training.find(x=>x.key===k)),...L.mental.map(k=>TAKTIK.LEADERSHIP.mental.find(x=>x.key===k))];
  const ln=lineup(an).filter(x=>x.player),avgAge=ln.length?ln.reduce((t,x)=>t+(x.player.age||0),0)/ln.length:0;
@@ -594,7 +598,7 @@ function vTraining(){const an=analyze(),st=STYLES[S.style];
  const tvIP=st.family==='possession'?['Passstil','Spielaufbau','Formation mit Ball','Chancen kreieren']:st.family==='counter'?['Ballvortrag','Formation mit Ball','Chancen kreieren','Spielaufbau']:['Formation mit Ball','Chancen kreieren','Passstil','Spielaufbau'];
  const pressing=/Hoch/.test((TCFG.instructions_oop||{}).Pressinglinie||'')||st.family==='pressing'||S.style==='vertical_tikitaka';
  const tvOOP=pressing?['Pressinglinie','Pressingintensität','Formation ohne Ball','Pressingfalle']:['Formation ohne Ball','Defensivblock','Defensive Positionierung','Pressinglinie'];
- const wa=areas(an).filter(a=>a.band==='schwach'),weak=wa.map(a=>a.name);
+ const fk=focus(an),wa=areas(an).filter(a=>fk.has(a.key)),weak=wa.map(a=>a.name);
  const rk=k=>fb.includes(k)?0:weak.includes(k)?1:2;
  const order=(arr,ph)=>{const a=[...wa.filter(x=>x.phase===ph&&!arr.includes(x.name)).map(x=>x.name),...arr];return a.sort((x,y)=>rk(x)-rk(y));};
  const ip=order(tvIP,'ip'),oop=order(tvOOP,'oop');
@@ -608,10 +612,10 @@ function vTraining(){const an=analyze(),st=STYLES[S.style];
   ['So',['Erholung','Teamgeist','Pause']]];
  const ratings=DATA.squad.filter(p=>p.tr&&p.tr[1]).sort((a,b)=>b.tr[1]-a.tr[1]);
  const avgR=ratings.reduce((s,p)=>s+p.tr[1],0)/Math.max(1,ratings.length);
- const sess=k=>`<div class="sess ${CAT[SESS[k]||'x'][1]}">${esc(k)}${fb.includes(k)?' <span class="pill w">Feedback</span>':''}${weak.includes(k)?' <span class="pill b">Schwachstelle</span>':''}<small>${esc(SESS_INFO[k]||'')}${CAT[SESS[k]]&&CAT[SESS[k]][0]?' · '+CAT[SESS[k]][0]:''}</small></div>`;
+ const sess=k=>`<div class="sess ${CAT[SESS[k]||'x'][1]}">${esc(k)}${fb.includes(k)?' <span class="pill w">Feedback</span>':''}${weak.includes(k)?' <span class="pill b">Baustelle</span>':''}<small>${esc(SESS_INFO[k]||'')}${CAT[SESS[k]]&&CAT[SESS[k]][0]?' · '+CAT[SESS[k]][0]:''}</small></div>`;
  return`<div class="card" style="margin-bottom:18px"><h2>Empfohlene Trainingswoche für „${esc(st.name)}“</h2>
  <p class="muted" style="margin-top:-6px">Spieltag Samstag, je Tag E1–E3. Taktischer Schwerpunkt mit Ball: ${ip.slice(0,3).join(', ')} · gegen den Ball: ${oop.slice(0,3).join(', ')}.
- ${fb.length?` Taktik-Feedback aus dem Spiel („mehr Zeit in ${fb.join(' / ')} investieren“) ist vorgezogen.`:''}${weak.length?` Schwache Taktikbereiche (${weak.join(', ')}) sind vorgezogen.`:''}
+ ${fb.length?` Taktik-Feedback aus dem Spiel („mehr Zeit in ${fb.join(' / ')} investieren“) ist vorgezogen.`:''}${weak.length?` Taktische Baustellen (${weak.join(', ')}) sind vorgezogen.`:''}
  Fußballerische Entwicklung: <b>${fe[0][0]}</b> (Ø ${fe[0][1].toFixed(1)}) und <b>${fe[1][0]}</b> (Ø ${fe[1][1].toFixed(1)}) – die schwächsten Bereiche deiner Startelf.${lowFit?' Fitness (Grundfitness/Ausdauer) ist niedrig → „Kondition“ statt „Leichtes Konditionstraining“.':''}</p>
  <div class="week">${week.map(([d,ss])=>`<div class="day"><b>${d}</b>${ss.map((k,i)=>`<div class="psub" style="font-size:10px;margin-top:${i?4:0}px">E${i+1}</div>${sess(k)}`).join('')}</div>`).join('')}</div>
  <ul class="tips" style="margin-top:12px"><li><b>Zwei Spiele pro Woche:</b> Di = Erholung · Individuelle Entwicklung · Pause, Mi = Geheimtraining · ${esc(ip[0])} · Pause, Do = Spiel.</li>
