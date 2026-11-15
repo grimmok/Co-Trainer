@@ -440,13 +440,18 @@ def _tactic_entry(t, p):
     return dict(pos=POS_BITS.get(pos), side=side, grp=_bits(grp), subs=tuple(subs), end=q)
 
 
+# Kopf einer eigenen Taktik: 22 44 00 1b 00 <?> 00 <Art: 00 eigene, 02 aktiv> <Länge u32> Name.
+# Das Byte <?> ist meist 00, bei „Ravenna vert tiki taka.fm“ 01 (Bedeutung unbekannt, 15.11.).
+TACTIC_HEAD = re.compile(rb'\x22\x44\x00\x1b\x00[\x00-\xff]\x00([\x00\x02])(.)\x00\x00\x00', re.S)
+
+
 def read_tactics(frames, names):
     """Eigene (benannte) Taktiken des Managers mit Positionen und Rollen mit/gegen den Ball."""
     if 'tactics_man' not in names:
         return []
     t = frames[names['tactics_man']]
     out = []
-    for m in re.finditer(rb'\x22\x44\x00\x1b\x00\x00\x00([\x00\x02])(.)\x00\x00\x00', t, re.S):
+    for m in TACTIC_HEAD.finditer(t):
         ln = m.group(2)[0]
         name = t[m.end():m.end() + ln].decode('utf-8', 'replace').strip()
         p = t.find(b'\x44\x00\x02', m.end() + ln, m.end() + ln + 200)

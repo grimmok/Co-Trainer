@@ -154,6 +154,17 @@ def test_squad_and_pool_scope_depend_on_source():
     assert extract.in_pool_scope(loaned_out, me, False) is True
 
 
+def test_tactic_head_variants():
+    # Kopf einer eigenen Taktik: 22 44 00 1b 00 <?> 00 <Art> <Länge u32> Name; das Byte <?> ist bei
+    # „Ravenna vert tiki taka.fm“ 01 statt 00 (15.11.), dort wurde sonst keine Taktik gefunden
+    ravenna = bytes.fromhex('2244001b 000000 00 2b000000')
+    tiki = bytes.fromhex('2244001b 000100 02 06000000')
+    for raw, kind, ln in ((ravenna, b'\x00', 0x2b), (tiki, b'\x02', 6)):
+        m = X.TACTIC_HEAD.match(raw)
+        assert m and m.group(1) == kind and m.group(2)[0] == ln
+    assert not X.TACTIC_HEAD.match(bytes.fromhex('2244001b 000000 05 06000000'))   # Art nur 00 oder 02
+
+
 def test_cup_words_skip_testimonials_but_not_leagues():
     # „Testimonial“ (Abschiedsspiele) wurde bei Sligo Rovers und Portsmouth als Liga angezeigt (15.11.)
     for name in ('Testimonial', 'Coppa Italia', 'Friendly', 'Champions League'):
