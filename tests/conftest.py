@@ -21,6 +21,25 @@ def ravenna_data(ravenna_save):
 
 
 @pytest.fixture(scope="session")
+def ravenna_game_db(ravenna_save):
+    from cotrainer import extract
+    frames, offs = extract.read_frames(ravenna_save)
+    names = extract.directory(frames, offs)
+    if 'game_db' not in names:
+        pytest.skip("game_db fehlt im Testspielstand")
+    return frames[names['game_db']]
+
+
+@pytest.fixture(scope="session")
+def lang_db_path():
+    from cotrainer import extract
+    path = extract.find_lang_db({})
+    if not path:
+        pytest.skip("lang_db.dat nicht gefunden")
+    return path
+
+
+@pytest.fixture(scope="session")
 def osijek_save():
     path = os.environ.get("COTRAINER_TEST_SAVE_OSIJEK") or os.path.join(
         os.path.dirname(DEFAULT_SAVE), "Ivan Kurasic – NK Osijek.fm")
