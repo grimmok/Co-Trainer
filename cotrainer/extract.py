@@ -412,10 +412,13 @@ ROLE_FP = {
 }
 # Stil-Code im Taktikkopf -> Schlüssel in STYLES (ui/index.html). Die Codes sind rückwärts geschriebene englische Kürzel.
 # Stilname im Spielstand je Code: TREV Vertikales Tiki-Taka, EGEG Gegenpressing, TNOC Ballbesitzspiel, IKIT Tiki-Taka,
-# TUOR Langer Hafer, GNIW Flügelspiel, ERID Catenaccio. Ballbesitzspiel und Catenaccio sind nur angenähert, weil
-# Co-Trainer sechs Stilfamilien hat (vertical_tikitaka, tikitaka, gegenpress, counter, wings, direct).
+# TUOR Langer Hafer, GNIW Flügelspiel, ERID Direktes Kontern, ETAC Catenaccio, KRAP Beton anrühren,
+# IULF Dynamisches Kontern. Co-Trainer hat nur sechs Stilfamilien (vertical_tikitaka, tikitaka, gegenpress, counter,
+# wings, direct); Ballbesitzspiel und alle vier defensiven/Konter-Stile (ERID, ETAC, KRAP, IULF) sind daher nur
+# angenähert, die vier Konter-Stile sind in Co-Trainer „Konterfußball“.
 STYLE_CODES = {'TREV': 'vertical_tikitaka', 'EGEG': 'gegenpress', 'TNOC': 'tikitaka', 'IKIT': 'tikitaka',
-               'TUOR': 'direct', 'GNIW': 'wings', 'ERID': 'counter'}
+               'TUOR': 'direct', 'GNIW': 'wings', 'ERID': 'counter', 'ETAC': 'counter', 'KRAP': 'counter',
+               'IULF': 'counter'}
 # Ersatzrolle, wenn ein Fingerabdruck (noch) unbekannt ist
 ROLE_DEFAULT = {'GK': ('gk', 'gk'), 'SW': ('cb', 'cb'), 'DC': ('cb', 'cb'), 'DR': ('fb', 'fb'), 'DL': ('fb', 'fb'),
                 'WBR': ('wb', 'wb'), 'WBL': ('wb', 'wb'), 'DM': ('dm', 'dm'), 'MC': ('cm', 'cm'),
@@ -444,14 +447,24 @@ def _tactic_entry(t, p):
     return dict(pos=POS_BITS.get(pos), side=side, grp=_bits(grp), subs=tuple(subs), end=q)
 
 
-# Kopf einer eigenen Taktik: 22 44 00 1b 00 <?> 00 <Art: 00 eigene, 02 aktiv> <Länge u32> Name.
+# Kopf einer eigenen Taktik: 22 44 00 1b 00 <?> 00 <Art: 00 oder 02> <Länge u32> Name.
+# Die Art 02 ist kein Aktiv-Merkmal, vermutlich der Standardname „Taktik“.
 # Das Byte <?> ist meist 00, bei „Ravenna vert tiki taka.fm“ 01 (Bedeutung unbekannt, 15.11.).
 TACTIC_HEAD = re.compile(rb'\x22\x44\x00\x1b\x00[\x00-\xff]\x00([\x00\x02])(.)\x00\x00\x00', re.S)
 
 
+def active_index(t, first_head):
+    """Index der aktiven Taktik: die 6 Byte vor dem ersten Taktikkopf sind <u32 Index> <u16 Index+1>."""
+    if first_head < 6:
+        return None
+    idx = struct.unpack_from('<I', t, first_head - 6)[0]
+    return idx if struct.unpack_from('<H', t, first_head - 2)[0] == idx + 1 else None
+
+
 def pick_tactic(saved):
-    """Die aktive Taktik ist der erste Platz in tactics_man (Befund aus fünf Ravenna-Spielständen, 15.11.)."""
-    return saved[0] if saved else None
+    """Die aktive Taktik ist der Datensatz mit chosen=True (Index vor dem ersten Kopf, Beleg „Ravenna 2 spieltaktik“:
+    Platz 2 gewählt -> Index 1). Ohne gültigen Index Rückfall auf den ersten Platz (alle früheren Spielstände: Index 0)."""
+    return next((s for s in saved if s.get('chosen')), saved[0] if saved else None)
 
 
 def read_tactics(frames, names):
@@ -460,7 +473,9 @@ def read_tactics(frames, names):
         return []
     t = frames[names['tactics_man']]
     out = []
-    for m in TACTIC_HEAD.finditer(t):
+    heads = list(TACTIC_HEAD.finditer(t))
+    chosen = active_index(t, heads[0].start()) if heads else None
+    for slot, m in enumerate(heads):
         ln = m.group(2)[0]
         name = t[m.end():m.end() + ln].decode('utf-8', 'replace').strip()
         p = t.find(b'\x44\x00\x02', m.end() + ln, m.end() + ln + 200)
@@ -507,7 +522,7 @@ def read_tactics(frames, names):
                           ip[1] if ip else '?', oop[1] if oop else '?', b['pos']])
         # active: Bedeutung des Bytes unklar, bei Standardnamen „Taktik“ immer 02; zur Auswahl taugt es nicht (pick_tactic)
         out.append(dict(name=name, active=m.group(1) == b'\x02', slots=slots, unknown=unknown,
-                        style_name=style_name, style_code=style_code))
+                        style_name=style_name, style_code=style_code, slot=slot, chosen=slot == chosen))
     return out
 
 

@@ -468,10 +468,30 @@ def test_pick_tactic_takes_first_slot():
     assert extract.pick_tactic([]) is None
 
 
+def test_active_index():
+    head = bytes.fromhex('2244001b 000000 00 2b000000')
+    ai = extract.active_index
+    assert ai(b'..' + bytes.fromhex('000000000100') + head, 8) == 0
+    assert ai(b'..' + bytes.fromhex('010000000200') + head, 8) == 1
+    assert ai(b'..' + bytes.fromhex('010000000100') + head, 8) is None     # u16 != u32 + 1
+    assert ai(b'abcde' + head, 5) is None                                  # erster Kopf bei Position < 6
+
+
+def test_pick_tactic_prefers_chosen():
+    saved = [{'name': 'T0'}, {'name': 'T1', 'chosen': True}, {'name': 'T2'}]
+    assert extract.pick_tactic(saved)['name'] == 'T1'
+    assert extract.pick_tactic([{'name': 'T0'}, {'name': 'T1'}])['name'] == 'T0'
+    assert extract.pick_tactic([{'name': 'T0', 'chosen': False}])['name'] == 'T0'
+    assert extract.pick_tactic([]) is None
+
+
 def test_style_codes_known():
     keys = {'vertical_tikitaka', 'tikitaka', 'gegenpress', 'counter', 'wings', 'direct'}
-    codes = ['TREV', 'EGEG', 'TNOC', 'IKIT', 'TUOR', 'GNIW', 'ERID']
+    codes = ['TREV', 'EGEG', 'TNOC', 'IKIT', 'TUOR', 'GNIW', 'ERID', 'ETAC', 'KRAP', 'IULF']
     assert all(extract.STYLE_CODES[c] in keys for c in codes)
+    exp = dict(TREV='vertical_tikitaka', EGEG='gegenpress', TNOC='tikitaka', IKIT='tikitaka', TUOR='direct',
+               GNIW='wings', ERID='counter', ETAC='counter', KRAP='counter', IULF='counter')
+    assert {c: extract.STYLE_CODES[c] for c in exp} == exp
 
 
 @pytest.mark.save
@@ -488,3 +508,22 @@ def test_newest_ravenna_saves_pick_first_tactic(suffix, code):
     saved = extract.read_tactics(frames, names)
     assert len(saved) == 3
     assert extract.pick_tactic(saved)['style_code'] == code
+
+
+@pytest.mark.save
+@pytest.mark.parametrize('suffix,name,code', [
+    (' 2 spieltaktik', '5-2-3 DM Breit (Kontrolliert) – Ballbesitzspiel', 'TNOC'),
+    (' beton anrühren', None, 'KRAP'), (' catanaccio', None, 'ETAC'),
+    (' Dire  Konter', None, 'ERID'), (' Dyn Konter', None, 'IULF')])
+def test_ravenna_saves_pick_chosen_tactic(suffix, name, code):
+    import os
+    from conftest import DEFAULT_SAVE
+    path = os.path.join(os.path.dirname(DEFAULT_SAVE), f"Haribaert Kachinski – Ravenna{suffix}.fm")
+    if not os.path.isfile(path):
+        pytest.skip(f"Spielstand fehlt: {path}")
+    frames, offs = extract.read_frames(path)
+    names = extract.directory(frames, offs)
+    t = extract.pick_tactic(extract.read_tactics(frames, names))
+    assert t['style_code'] == code
+    if name:
+        assert t['name'] == name
