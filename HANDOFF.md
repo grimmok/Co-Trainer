@@ -368,12 +368,11 @@ Grundlage: `Trainertest 2.fm` (unverändert) gegen `Trainertest 2 traainer.fm` (
 
 ### Als Nächstes (Stand 15.11. spät, `main` = Teile 1–3 + aktive Taktik + Kleinigkeiten aus Teil 3 (Punkt 20), `dist\Co-Trainer.exe` vom 15.11. 19:32 mit Punkt 20, 138 Tests grün)
 
-1. **GitHub einrichten (begonnen, wartet auf den Nutzer).** Laut Nutzer gibt es schon ein Repository; die Adresse fehlt noch, im Projekt ist kein Remote eingetragen.
-   - `gh` ist installiert (`C:\Program Files\GitHub CLI\gh.exe`, in der laufenden Sitzung noch nicht im PATH), aber nicht angemeldet: `gh auth login` (Browser, HTTPS).
-   - Der GitHub-MCP-Server (Plugin) scheitert mit „HTTP 400 … Authorization header is badly formatted“, weil `GITHUB_PERSONAL_ACCESS_TOKEN` nicht gesetzt ist (`.mcp.json` schickt `Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}`). Abhilfe: nach `gh auth login` `setx GITHUB_PERSONAL_ACCESS_TOKEN (gh auth token)`, dann Claude Code neu starten. Für `git push` ist der MCP-Server nicht nötig.
-   - Vor dem ersten Push entscheiden: privat oder öffentlich (Empfehlung: erst privat); ob die Autor-E-Mail in den Commits durch die GitHub-noreply-Adresse ersetzt wird (geht nur vor dem ersten Push sauber); Nutzername und Pfade `%USERPROFILE%\…` stehen in `CLAUDE.md`, `HANDOFF.md`, Spec, Plänen und `tests/conftest.py`; `config.json` (Karrieredaten, Entwicklerhilfe) ist eingecheckt.
-   - Alles liegt in `main`; ein Pull Request entsteht erst mit dem nächsten Branch (Teil 4).
-2. **Teil 4 planen und bauen:** README (Start, Windows-Schutzhinweis wegen fehlender Signatur, WebView2), Lizenzhinweise (MIT für Co-Trainer und fmsave), persönliche Daten aus dem Repo nehmen (siehe 1), GitHub-Release mit `Co-Trainer.exe`.
+1. ~~GitHub einrichten~~ erledigt am 15.11.: Remote `origin` = https://github.com/grimmok/Co-Trainer (privat, MIT-Lizenz aus GitHub übernommen), `main` verfolgt `origin/main`.
+   - Vor dem ersten Push wurden alle Commits auf die noreply-Adresse `317344714+grimmok@users.noreply.github.com` umgeschrieben; `user.email` des Projekts steht darauf. Der lokale Zweig `backup-vor-noreply` hält den alten Stand (kann gelöscht werden).
+   - `gh` ist weiter nicht angemeldet. Der Token steht in der Benutzervariable `GITHUB_PERSONAL_ACCESS_TOKEN`; Claude pusht damit über einen einmaligen `http.extraheader` (nichts gespeichert). Der GitHub-MCP-Server sieht den Token erst nach einem Neustart von Claude Code.
+   - Noch offen für Teil 4: Nutzername und Pfade `%USERPROFILE%\…` in `CLAUDE.md`, `HANDOFF.md`, Spec, Plänen und `tests/conftest.py`; `config.json` (Karrieredaten) ist eingecheckt.
+2. **Teil 4 planen und bauen:** README (Start, Windows-Schutzhinweis wegen fehlender Signatur, WebView2), Lizenzhinweise (`LICENSE` MIT liegt schon im Repo; Hinweis auf fmsave fehlt), persönliche Daten aus dem Repo nehmen (siehe 1), GitHub-Release mit `Co-Trainer.exe`. Ab jetzt in einem Branch arbeiten, damit ein Pull Request entsteht.
 3. **Rollentest (B.1)** hat Vorrang bei der Dekodierung: bei Osijek sind 17 von 22 Rollen unbekannt, bei „Ravenna 2 spieltaktik“ (5-2-3) 20.
 4. **Vom Nutzer zu bestätigen:** siehe A.7 (offen: Konter-/Ballbesitz-Annäherungen der Stil-Codes, Karte → Tendenz bei `sure:false`, Bereiche und Baustellen-Grenze 0,3 gegen „Taktische Effektivität“, ob in „2 spieltaktik“ die 5-2-3-Taktik die Spieltaktik ist, Stufengrenzen der Trainerbewertungen, Name „Co-Trainer“).
 5. ~~Zurückgestellte Kleinigkeiten aus Teil 3~~ erledigt (Punkt 20). Aufgefallen: Durchschnitte im Training und im Taktik-Reiter stehen mit Punkt statt Komma (z. B. „Ø 10.4“).
