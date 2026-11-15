@@ -154,6 +154,17 @@ def test_squad_and_pool_scope_depend_on_source():
     assert extract.in_pool_scope(loaned_out, me, False) is True
 
 
+def test_read_scout_area_variants():
+    def area(b):
+        return extract.read_scout_area({0: bytes(20) + b + bytes(20)}, {'humans': 0})
+    date = bytes.fromhex('b41aea07 01006c07')
+    assert area(bytes.fromhex('3300 04 01000000 2000 0100') + date) == 4      # Ravenna
+    assert area(bytes.fromhex('3300 07 07000000 2000 0500') + date) == 7      # Osijek (15.11.): 05 statt 01
+    assert area(bytes.fromhex('3300 01 00000000 0000 0000') + date) is None   # kein „20 00“
+    assert area(bytes.fromhex('3300 03 01000000 2000 0100 b41a 0000')) is None  # kein Jahr 2000–2047
+    assert extract.read_scout_area({}, {}) is None
+
+
 @pytest.mark.save
 def test_osijek_reads_first_team_from_fmsave(osijek_save):
     data = extract.analyse(osijek_save)
@@ -163,8 +174,10 @@ def test_osijek_reads_first_team_from_fmsave(osijek_save):
     assert 20 <= len(data["squad"]) <= 30 and len(data["pool"]) > 1000
     f = m["finances"]                                                # per Screenshot bestätigt (14.11.)
     assert f["wage_budget_week"] == 50451 and f["transfer_budget"] == 499998
-    # Der Kontostand ändert sich, wenn der Nutzer weiterspielt (Screenshot 14.11.: 6.713.387)
+    # Der Kontostand ändert sich, wenn der Nutzer weiterspielt (Screenshots: 14.11. 6.713.387, 15.11. 6,82 Mio. =
+    # gelesen 6.824.841)
     assert isinstance(f["balance"], int) and f["balance"] > 0
+    assert m["scout_area"] == 7 and m["scout_filter"] == 7          # Weltweit (Bytes 15.11., Screenshot passt)
     assert f["wage_payroll_week"] == 45680              # Gehaltskosten gesamt laut Screenshot
 
 

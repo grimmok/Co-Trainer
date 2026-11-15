@@ -497,8 +497,9 @@ def read_tactics(frames, names):
 
 
 # ---------------------------------------------------------------- Scoutinggebiet
-# Stufe im Abschnitt "humans": 33 00 <Stufe u8> <u32> 20 00 01 00 <Datum>.
-# Mit Spielständen des Nutzers abgeglichen (10.11.): Ravenna 1–7, Paris 2 und 4.
+# Stufe im Abschnitt "humans": 33 00 <Stufe u8> <u32> 20 00 <u16> <Datum: u16, Jahr u16>.
+# Mit Spielständen des Nutzers abgeglichen (10.11.): Ravenna 1–7, Paris 2 und 4. Das u16 nach „20 00“ ist bei
+# Ravenna 1, bei Osijek 5 (15.11., Stufe 7 Weltweit); deshalb wird stattdessen ein Jahr 2000–2047 verlangt.
 SCOUT_AREAS = {1: 'Kein Scouting', 2: 'Eigene Liga', 3: 'Angrenzende Ligen', 4: 'Eigenes Land',
                5: 'Region', 6: 'Kontinent', 7: 'Weltweit'}
 
@@ -508,7 +509,7 @@ def read_scout_area(frames, names):
     if 'humans' not in names:
         return None
     h = frames[names['humans']]
-    hits = {m.group(1)[0] for m in re.finditer(rb'\x33\x00([\x01-\x07])[\x00-\xff]{4}\x20\x00\x01\x00', h, re.S)}
+    hits = {m.group(1)[0] for m in re.finditer(rb'\x33\x00([\x01-\x07])[\x00-\xff]{4}\x20\x00[\x00-\xff]{4}[\xd0-\xff]\x07', h, re.S)}
     return hits.pop() if len(hits) == 1 else None
 
 
@@ -801,7 +802,7 @@ VIS_POOL, QUALITY_POOL = 4000, 4000
 REP_PER_POINT = 50          # Reputationsabstand → Skala des früheren Stärkeabstands (Serie A ↔ Serie C ≈ 56)
 FREE_AGENT_DIFF = -10       # Vereinslose wollen eher wechseln
 REP_DIFF_MIN = -4           # viel kleinere Vereine: Deckel, sonst landet fast jeder in den 90ern
-WILL_BASE = 68              # Wechselchance bei gleich großem Verein, 2 Jahren Vertrag, neutraler Persönlichkeit
+WILL_BASE = 68              # Wechselchance bei gleich großem Verein, 2 Jahren Vertrag, Alter unter 31
 
 
 def club_rep_diff(club, my_id, club_map):
@@ -1081,7 +1082,7 @@ def _analyse(save, frames, names, cfg, progress):
         return (datetime.date.fromisoformat(c['end']) - game_date).days / 365.25
 
     def willingness(pl):
-        """0-100: wie wahrscheinlich ein Wechsel zu uns ist (Schätzung, nutzt Persönlichkeit nur intern).
+        """0-100: wie wahrscheinlich ein Wechsel zu uns ist (Schätzung, ohne Persönlichkeit).
         Mit fmsave zählt die Vereinsreputation; nie die Stärke (CA) fremder Spieler oder Vereine."""
         return player_willingness(pl, my_id, club_map, fd is not None, years_left(pl['id']), age_of(pl['dob']))
 

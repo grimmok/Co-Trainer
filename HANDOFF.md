@@ -270,7 +270,7 @@ Grundlage: `Trainertest 2.fm` (unverändert) gegen `Trainertest 2 traainer.fm` (
 ### Scoutinggebiet (gelöst am 10.11.)
 
 - Einstellung im Spiel, sieben Stufen. Die Spielerdatenbank im Spiel zeigt dann automatisch Spieler dieses Gebiets.
-- **Fundort:** Abschnitt `humans`, ein Byte im Muster `33 00 <Stufe> <u32> 20 00 01 00 <Datum>`. Gelesen von `read_scout_area` in `cotrainer/extract.py`; steht als `meta.scout_area` (Zahl) und `meta.scout_area_name` in den Daten; die Transfervorschläge filtern seit Teil 2b danach.
+- **Fundort:** Abschnitt `humans`, ein Byte im Muster `33 00 <Stufe> <u32> 20 00 <u16> <Datum>`. Das `u16` ist bei Ravenna 1, bei Osijek 5 (15.11.; bis dahin verlangte das Muster 1, deshalb „nicht gefunden“). Seitdem wird statt der 1 ein Jahr 2000–2047 im Datum verlangt. Osijek: Stufe 7 = Weltweit (Screenshot des Nutzers: die unteren Stufen sind nicht gewählt). Gelesen von `read_scout_area` in `cotrainer/extract.py`; steht als `meta.scout_area` (Zahl) und `meta.scout_area_name` in den Daten; die Transfervorschläge filtern seit Teil 2b danach.
 - **Werte**, abgeglichen mit benannten Spielständen des Nutzers (Ravenna alle sieben, Paris 2 und 4):
 
   | Wert | Stufe | Beispiel Ravenna |
@@ -308,6 +308,7 @@ Grundlage: `Trainertest 2.fm` (unverändert) gegen `Trainertest 2 traainer.fm` (
   - Restlaufzeit des Vertrags, Alter, Vereinslosigkeit
   - Unbekannte Vereine gelten als neutral.
   - **Keine Persönlichkeit** (Ehrgeiz, Loyalität) und keine Spielerqualität: beides sieht man im Spiel ohne Scouting nicht (Entscheidung des Nutzers, 15.11.).
+- **Stufe „Aus“, Sortierung „Empfehlung“, gemischt über die Ligen** (Entscheidung des Nutzers, 15.11.): `mixLeagues` in `index.html`; jeder weitere Spieler derselben Liga (Staffeln zusammengefasst, vereinslos und „ohne Liga“ je eine Gruppe) zählt `MIX_PEN` = 4 Punkte weniger. Ravenna, erste 80: Serie C 23, Serie BKT 19, ohne Liga 19, vereinslos 19 (vorher 80 × Serie C). Die anderen Sortierungen mischen nicht.
 - **Stufe „Scoutbericht“** zeigt keine Zahlen „Fit“ und „+ zur Startelf“; die gibt es nur in „Werte“ (Entscheidung des Nutzers, 15.11.).
 - **Marktwert** ist eine eigene Schätzung: `2200·e^((CA−50)/12,5)` mit Faktoren für Alter, Vertrag und Liga. Es ist kein Spielwert.
 - **Eigener Verein:** der Verein mit den meisten Spielern in den Trainingsbewertungen; sonst der Name aus `save_game_summary`.
@@ -335,8 +336,8 @@ Grundlage: `Trainertest 2.fm` (unverändert) gegen `Trainertest 2 traainer.fm` (
 - **Torwartwahl:** Durch die Gewichtung „Ballspielender Torwart“ wählt das Programm bei Paris Nkambadio statt Trapp.
 - **Spielstandwahl:** Backups sind ausgeschlossen, aber `find_save` nimmt weiterhin den neuesten Spielstand *jeder* Karriere (keine Einschränkung auf einen Manager).
 - **Ungeprüfte Werte:** Das garantierte Mindestbudget für die nächste Saison ist nicht mit dem Spiel abgeglichen. Die Wechselchance ist eine Annahme (seit Teil 2b aus der Vereinsreputation).
-- **Stufe „Aus“, Empfehlung zu einförmig:** Bei Ravenna stehen in den ersten 80 (ohne Positionsfilter) nur Serie-C-Spieler (C/C 35, C/A 24, C/B 21), keine Vereinslosen, kein Serie-BKT- oder Serie-D-Spieler. Grund: +40 für die schwächste Position (LA) und +15 für auslaufende Verträge entscheiden; der beste Serie-BKT-Spieler steht auf Platz 82, der beste ohne Liga auf 115, der beste Vereinslose auf 124. Die Gewichtung der Empfehlung ist mit dem Nutzer abzustimmen.
-- **Osijek-Kontostand:** Der Test prüft nur noch „> 0“, weil der Nutzer den Spielstand neu gespeichert hat. Der Screenshot-Wert vom 14.11. war 6.713.387 €.
+- **Osijek-Kontostand:** Der Test prüft nur „> 0“, weil der Nutzer mit Osijek weiterspielt. Abgleich per Screenshot am 15.11.: 6,82 Mio. € im Spiel, gelesen 6.824.841 €; Transferbudget, Gehaltskosten (2,37 Mio. €/J.) und verfügbares Gehaltsbudget (248K €/J.) stimmen ebenfalls.
+- **Spiel läuft:** Speichert das Spiel während des Einlesens, bricht fmsave ab (`SaveChangedError`) und der eigene Leser findet bei Osijek keinen Kader. Dann den Spielstand später neu einlesen.
 
 ## Nächste Schritte
 
@@ -371,8 +372,9 @@ Stand 14.11.: **Teil 1 ist gebaut** (acht Tasks des Plans, Branch `programm-entw
    - ob bei „Angrenzende Ligen“ alle Serie-C-Staffeln gemeint sind (Annahme Claude: ja);
    - **Teil 2b:** Ligastufe aus Reputation (prüfen in der Spielerdatenbank mit Scoutinggebiet „Angrenzende Ligen“);
    - Regionen außer 11 sind übertragen, nicht geprüft (Kosovo liegt laut Nationentabelle ebenfalls in Region 11, Südeuropa, steht aber nicht in der bisherigen Liste);
-   - neue Wechselchance (aus Vereinsreputation);
-   - neuer Screenshot der Osijek-Finanzen;
+   - ~~neue Wechselchance (aus Vereinsreputation)~~ vom Nutzer am 15.11. im Spiel bestätigt (Ravenna): Spaggiari 83 % → bereit zu Gesprächen, Luzi 49 % → will mehr. Ausnahme Finotti (49 %): „nicht interessiert, noch nicht lange bei meinem neuen Verein“ (im Juli gewechselt). Frisch gewechselte Spieler kennt die Wechselchance noch nicht. fmsave hat `Player.club_join_date`, aber im Ravenna-Spielstand (Spieldatum 8.8.2026) steht bei Finotti 1.9.2026 (Spiel: „im Juli gewechselt“) und bei Luzi 1.8.2026 (trotzdem verhandlungsbereit). Bedeutung des Felds unklar, deshalb noch nicht eingebaut;
+   - ~~neuer Screenshot der Osijek-Finanzen~~ (15.11., stimmt);
+   - Angrenzende Ligen bei Osijek laut Spiel: „HNL und 1. NL“ (eigene Liga plus eine darunter, darüber gibt es keine). Passt zur Regel „Stufe ± 1“; ob das Programm genau diese beiden Ligen wählt, ist mit Osijek noch nicht geprüft;
    - der Schalter „Auch außerhalb meines Scoutinggebiets suchen“ fehlt noch.
    - Stil-Code `TREV` = Vertikales Tiki-Taka;
    - Stufengrenzen der Trainerbewertungen unterhalb von 18 (bisher nur aus Profil-Screenshots abgeleitet);

@@ -403,7 +403,17 @@ function vTransfer(){const sl=slots(),aus=W.info==='aus',m=DATA.meta,sk=sortKey(
  ${aus?'':`<label class="f" style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" ${S.f.budget?'checked':''} onchange="S.f.budget=this.checked;save();renderSug()"> im Transferbudget</label>`}
  <label class="f" style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" ${S.f.free?'checked':''} onchange="S.f.free=this.checked;save();renderSug()"> nur ablösefrei/ auslaufend</label></div>
  ${area?`<p class="muted" style="margin:-4px 0 10px">${area}</p>`:''}
- <div id="sug"></div><p class="note">${aus?'':'Preis = geschätzter Marktwert aus Qualität, Alter, Liga und Vertragslaufzeit (keine Spielangabe). '}${m.source==='fmsave'?'Wechselchance = Schätzung aus Vereinsreputation, Vertragslaufzeit, Alter und Persönlichkeit des Spielers.':'Wechselchance = Schätzung aus Vertragslaufzeit, Alter und Persönlichkeit des Spielers.'}</p></div>`;}
+ <div id="sug"></div><p class="note">${aus?'':'Preis = geschätzter Marktwert aus Qualität, Alter, Liga und Vertragslaufzeit (keine Spielangabe). '}${m.source==='fmsave'?'Wechselchance = Schätzung aus Vereinsreputation, Vertragslaufzeit und Alter.':'Wechselchance = Schätzung aus Vertragslaufzeit und Alter.'}</p></div>`;}
+/* Mischung über Ligen: jeder weitere Spieler derselben Liga (Staffeln zusammengefasst, vereinslos und ohne Liga
+   je eine Gruppe) zählt MIX_PEN Punkte weniger. Nur sichtbare Merkmale. rows nach rec absteigend sortiert. */
+const MIX_PEN=4;
+const lgGroup=p=>!p.club?'vereinslos':p.lg?p.lg.replace(/\/.*$/,''):'ohne Liga';
+function mixLeagues(rows,n){const left=rows.slice(),cnt={},out=[];
+ while(out.length<n&&left.length){let bi=0,bv=-Infinity;
+  for(let j=0;j<left.length;j++){const v=left[j].rec-MIX_PEN*(cnt[lgGroup(left[j].p)]||0);if(v>bv){bv=v;bi=j;}
+   if(left[j].rec<=bv)break;}  /* sortiert: ab hier kann keiner mehr gewinnen */
+  const x=left.splice(bi,1)[0];const g=lgGroup(x.p);cnt[g]=(cnt[g]||0)+1;out.push(x);}
+ return out;}
 /* Stufe „Aus“: nur sichtbare Spieler (p.vis), Positionen ≥ 15, eigene Startelf (an.assign) für die schwächsten Plätze */
 function renderSugAus(el,an){const sl=an.sl;
  const order=sl.map((s,i)=>[i,an.assign[i]?an.assign[i].sc:0]).sort((a,b)=>a[1]-b[1]).map(x=>x[0]);
@@ -419,7 +429,7 @@ function renderSugAus(el,an){const sl=an.sl;
   rows.push({p,rec,why:why.slice(0,2),i:idx.find(i=>posRating(p,sl[i].pos)>=15)});}
  const endT=p=>!p.club?-Infinity:p.end?new Date(p.end).getTime():Infinity;
  const sorters={rec:(a,b)=>b.rec-a.rec,will:(a,b)=>(b.p.will||0)-(a.p.will||0)||b.rec-a.rec,young:(a,b)=>a.p.age-b.p.age||b.rec-a.rec,end:(a,b)=>endT(a.p)-endT(b.p)||b.rec-a.rec};
- rows.sort(sorters[sortKey()]);const top=rows.slice(0,80);
+ rows.sort(sorters[sortKey()]);const top=sortKey()==='rec'?mixLeagues(rows,80):rows.slice(0,80);
  if(!top.length){el.innerHTML=`<div class="muted" style="padding:30px;text-align:center">${DATA.meta.scout_area===1?`In deinem Scoutinggebiet (Kein Scouting) gibt es gerade keine passenden vertragslosen Spieler aus ${esc(DATA.meta.nat_name||'deinem Land')}.`:'Keine passenden Kandidaten – Filter lockern (Position, Alter, Wechselchance).'}</div>`;return;}
  el.innerHTML=`<div class="tblw"><table class="tbl"><thead><tr><th>Spieler</th><th>Positionen</th><th>Verein · Liga</th><th>Vertrag bis</th><th class="num">Wechselchance</th><th>Grund</th></tr></thead><tbody>
  ${top.map(x=>{const p=x.p;
@@ -427,7 +437,7 @@ function renderSugAus(el,an){const sl=an.sl;
   <td>${posNames(p)||'–'}</td><td>${esc(p.club||'vereinslos')}${p.lg?'<div class="psub">'+esc(p.lg)+'</div>':''}</td>
   <td class="psub">${p.end?new Date(p.end).toLocaleDateString('de-DE'):'–'}</td><td class="num"><b>${p.will??'–'} %</b></td>
   <td class="psub" style="max-width:300px">${x.why.map(esc).join('<br>')||'–'}</td></tr>`;}).join('')}</tbody></table></div>
- <p class="note">${rows.length} Spieler passen zu den Positionen deiner Startelf, angezeigt werden die ersten 80. Reihenfolge nur nach dem, was du im Spiel ohne Scouting siehst: Position, Vertrag, Wechselchance, Alter.</p>`;}
+ <p class="note">${rows.length} Spieler passen zu den Positionen deiner Startelf, angezeigt werden die ersten 80. Reihenfolge nur nach dem, was du im Spiel ohne Scouting siehst: Position, Vertrag, Wechselchance, Alter${sortKey()==='rec'?', gemischt über die Ligen':''}.</p>`;}
 function renderSug(){const el=document.getElementById('sug');if(!el)return;const an=analyze(),sl=an.sl,f=DATA.meta.finances||{},bud=f.transfer_budget||0;
  if(W.info==='aus')return renderSugAus(el,an);const rep=W.info==='scoutbericht';
  const idx=S.f.pos===''?sl.map((_,i)=>i):[+S.f.pos];const rows=[];
