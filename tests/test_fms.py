@@ -18,7 +18,7 @@ def player(**kw):
                 positions=NS(**{n: 20 if n == 'stc' else 1 for n in POS_NAMES}),
                 personality=NS(adaptability=1, ambition=2, loyalty=3, pressure=4, professionalism=5,
                                sportsmanship=6, temperament=7, controversy=8),
-                left_foot=6, right_foot=20,
+                left_foot=6, right_foot=20, nation_id=None,
                 contract=NS(wage=4008, end=datetime.date(2027, 6, 30)))
     base.update(kw); return NS(**base)
 
@@ -39,6 +39,19 @@ def test_player_record_edge_cases():
     assert fms.player_record(player(ability=NS(current=90, potential=None)))['pa'] == 90
     assert fms.player_record(player(ability=NS(current=90, potential=-75)))['pa'] == 90
     assert fms.player_record(player(personality=None))['pers'] is None
+
+def test_player_nation_maps_to_database_id():
+    p = player(nation_id=150)
+    assert fms.player_record(p, {150: 776})['nat'] == 776
+    assert fms.player_record(p, {})['nat'] is None
+    assert fms.player_record(player(nation_id=None), {150: 776})['nat'] is None
+    assert fms.player_record(p)['nat'] is None
+
+def test_club_record_has_nation_and_reputation():
+    c = NS(uid=7, name='Ravenna Football Club 1913', short_name='Ravenna', nation_id=150, reputation=4337)
+    assert fms.club_record(c, {150: 776}) == dict(name='Ravenna Football Club 1913', short='Ravenna', nat=776, rep=4337)
+    c2 = NS(uid=8, name='X', short_name='', nation_id=None, reputation=None)
+    assert fms.club_record(c2, {}) == dict(name='X', short='X', nat=None, rep=0)
 
 def test_comps_from_fixtures_uses_first_team_league_matches():
     fx = [NS(competition_id=5, home_club_uid=a, away_club_uid=b, home_team_slot=0, away_team_slot=0)

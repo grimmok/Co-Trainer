@@ -39,7 +39,14 @@ def _val(obj, name, default):
     return default if v is None else v
 
 
-def player_record(p):
+def club_record(c, nat_db):
+    """fmsave-Verein -> Vereinsdatensatz; nat = Datenbank-Nr. der Nation, rep = Reputation (fehlend 0)."""
+    nid = getattr(c, 'nation_id', None)
+    return dict(name=c.name, short=c.short_name or c.name,
+                nat=nat_db.get(nid) if nid is not None else None, rep=_val(c, 'reputation', 0))
+
+
+def player_record(p, nat_db=None):
     """fmsave-Spieler -> Spielerdatensatz wie in extract._analyse; None ohne Geburtsdatum."""
     if p.birth_date is None:
         return None
@@ -57,11 +64,13 @@ def player_record(p):
         pers = [getattr(p.personality, f, None) for f in _PERS_FIELDS]
         if not all(isinstance(x, int) and 1 <= x <= 20 for x in pers):
             pers = None
+    nid = getattr(p, 'nation_id', None)
+    nat = nat_db.get(nid) if nat_db and nid is not None else None
     return dict(id=p.uid, name=(p.name or '').strip() or f'#{p.uid}', dob=p.birth_date, club=p.club_uid or 0,
                 first=(getattr(p, 'first_name', None) or '').strip(), last=(getattr(p, 'last_name', None) or '').strip(),
                 loan_parent=getattr(p, 'loan_parent_club_uid', None),
                 ca=ca, pa=pa, pos=[_val(p.positions, f, 1) for f in _POS_FIELDS], attrs=attrs, pers=pers,
-                team_slot=p.team_slot)
+                team_slot=p.team_slot, nat=nat)
 
 
 assert len(ATTR_KEYS) == len(_ATTR_FIELDS) + 2
@@ -109,15 +118,16 @@ def read(path, cnames, club_name):
                 if own is None:
                     log('fmsave: kein eigener Verein')
                     return None
+                nat_db = {n.nation_id: n.database_id for n in s.nations()}
                 players, contracts = {}, {}
                 for p in s.players():
-                    r = player_record(p)
+                    r = player_record(p, nat_db)
                     if r is None:
                         continue
                     players[p.uid] = r
                     if p.contract is not None:
                         contracts[p.uid] = contract_record(p.contract)
-                clubs = {c.uid: dict(name=c.name, short=c.short_name or c.name) for c in s.clubs()}
+                clubs = {c.uid: club_record(c, nat_db) for c in s.clubs()}
                 comp_db = {c.id: c.database_id for c in s.competitions()}
                 comps = comps_from_fixtures(s.fixtures(), comp_db, cnames)
         for w in caught:                       # der unbekannte Build gehört bei FM27 dazu; alles andere melden
