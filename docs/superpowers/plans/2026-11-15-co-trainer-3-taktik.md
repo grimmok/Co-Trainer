@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Der Bereich „Trainer & Taktik“ wird zum Reiter „Taktik“. Er zeigt acht taktische Bereiche mit Einschätzung und bei Schwächen, wer sie verursacht und was hilft. Dazu kommen alle Trainerbewertungen als Textstufe und die Trainertendenzen per Auswahl pro Karriere. Schwache Bereiche steuern den Trainingsvorschlag und einen Filter der Transfervorschläge.
+**Goal:** Der Bereich „Trainer & Taktik“ wird zum Reiter „Taktik“. Er zeigt acht taktische Bereiche mit Einschätzung und bei Schwächen, wer sie verursacht und was hilft. Dazu kommen alle Trainerbewertungen als Textstufe und der Führungsstil (daraus die Trainertendenzen) per Auswahl pro Karriere. Schwache Bereiche steuern den Trainingsvorschlag und einen Filter der Transfervorschläge.
 
 **Architecture:** Die Rechenlogik (Bereiche, Verursacher, Abhilfe, Hinweise zu Trainer und Tendenzen) liegt als reine Funktionen ohne DOM in der neuen Datei `cotrainer/ui/taktik.js`. Sie wird in `index.html` per `<script src="taktik.js">` geladen und mit `node --test` getestet. `index.html` baut daraus die Ansicht. Python ändert sich nicht: Die Trainerbewertungen kommen schon als Textstufe aus `extract.py` (`coach.coaching`, `coach.mental`).
 
@@ -16,21 +16,21 @@
 - CA, PA, versteckte Attribute, Persönlichkeit und die Zahlen der Trainerbewertungen erreichen die Oberfläche nie. Trainerbewertungen erscheinen nur als Textstufe: Sehr schlecht (bis 6), Schlecht (7–9), Durchschnitt (10–11), Gut (12–15), Sehr gut (16–17), Herausragend (18–19), Elite (20).
 - Werte des **eigenen** Kaders dürfen sichtbar sein (Spec 7.1). Die Taktikbereiche rechnen nur mit eigenen Spielern.
 - In Transfer-Stufe „Aus“ darf nichts aus CA/PA/Attributen fremder Spieler abgeleitet sein (Spec 7.2). Der neue Schwachstellen-Filter nutzt nur Positionen.
-- Kein Trainerprofil-Formular. Die Trainertendenzen wählt der Nutzer einmal pro Karriere aus einer Liste; sie werden im `localStorage` unter dem Karriereschlüssel `KEY` gespeichert (Spec 8.2, 8.3).
+- Kein Trainerprofil-Formular. Die Trainertendenzen ergeben sich wie im Spiel aus dem **Führungsstil**: 3 von 9 Karten unter „Training“, 2 von 6 unter „Mentales“. Der Nutzer wählt sie einmal pro Karriere; die Wahl liegt im `localStorage` unter dem Karriereschlüssel `KEY` (Spec 8.2, 8.3).
 - Teamanweisungen sind nicht dekodiert: Der Taktik-Reiter zeigt keine Teamanweisungen (Spec 11).
 - Keine Online-Funktionen, keine erzeugte HTML-Datei, keine Batch-Datei. Spielstände nur lesen.
 - Arbeit auf dem Branch `teil-3-taktik`; Commit-Nachrichten auf Deutsch.
 
-## Vorbedingung (vom Nutzer)
+## Führungsstil und Tendenzen (Screenshots des Nutzers, 15.11., `%USERPROFILE%\Pictures\fm tool\Tendenzen`)
 
-Die vollständige Liste der FM27-Trainertendenzen steht nicht in `lang_db.dat` (geprüft 15.11.) und muss per Screenshot vom Nutzer kommen. Bis dahin enthält `TENDENCIES` die sieben bekannten Texte aus `config.json` (Task 3). Die Liste wird ergänzt, sobald der Screenshot da ist; der Plan braucht dafür keine weitere Änderung.
+Im Spiel („Ihr Stil“) wählt man 3 von 9 Trainingskarten und 2 von 6 Mentalkarten; jede Karte bringt eine Tendenz ins Trainerprofil. Die Texte stehen nicht in `lang_db.dat`. Aus den Screenshots ist die Zuordnung Karte → Tendenz bei sechs Karten eindeutig; bei den übrigen ist nur die Gruppe sicher (die Karten wurden zusammen gewählt). Für sie gilt die Zuordnung nach dem Sinn, markiert mit `sure:false`, bis der Nutzer sie bestätigt. Die Taktik-Hinweise hängen deshalb am Kartennamen, nicht am Tendenztext.
 
 ## Review Focus
 
 1. **Leere Plätze in der Startelf** (zu wenige passende Spieler): Bereiche rechnen nur mit besetzten Plätzen; ein Bereich ohne besetzten Platz zeigt „nicht bewertbar“ statt eines Fehlers. Test in Task 1.
 2. **Unbekannte Rollen-ID** (z. B. aus einem älteren `localStorage`): Gewicht fällt auf 1 für alle Attribute zurück, kein Absturz. Test in Task 1.
-3. **Fehlende Trainerbewertungen** (`coach.coaching` leer, Block nicht gefunden): keine Trainerhinweise, Hinweistext „Im Spielstand wurden keine Trainerbewertungen gefunden.“, Tendenzauswahl funktioniert trotzdem. Test in Task 3.
-4. **Gespeicherte Tendenz, die nicht mehr in der Liste steht**: wird ignoriert, keine Fehlermeldung. Test in Task 3.
+3. **Fehlende Trainerbewertungen** (`coach.coaching` leer, Block nicht gefunden): keine Trainerhinweise, Hinweistext „Im Spielstand wurden keine Trainerbewertungen gefunden.“, Auswahl des Führungsstils funktioniert trotzdem. Test in Task 3.
+4. **Gespeicherte Führungsstil-Wahl, die nicht (mehr) passt** (unbekannte Karte, mehr als 3 bzw. 2 Karten aus älterem `localStorage`): unbekannte Karten werden ignoriert, überzählige abgeschnitten, keine Fehlermeldung. Test in Task 3.
 5. **Schwachstellen-Filter plus Positionsfilter ohne Schnittmenge**: klare Meldung statt leerer Tabelle. Prüfung im Browser-Skript von Task 4.
 
 ---
@@ -223,33 +223,58 @@ git commit -m "Reiter Taktik: Bereiche, Verursacher und Abhilfe"
 
 ---
 
-### Task 3: Trainerbewertungen als Textstufen und Trainertendenzen pro Karriere
+### Task 3: Trainerbewertungen als Textstufen und Führungsstil pro Karriere
 
 **Files:**
 - Modify: `cotrainer/ui/taktik.js`
-- Modify: `cotrainer/ui/index.html` (Karte „Trainer“ in `vTaktik`, `load()` für `S.tend`)
+- Modify: `cotrainer/ui/index.html` (Karte „Trainer“ in `vTaktik`, `load()` für `S.lead`)
 - Test: `tests/js/taktik.test.mjs`
 
 **Interfaces:**
 - Consumes: `areaRatings` (Task 1), `areas(an)` (Task 2).
 - Produces:
-  - `TENDENCIES`: Array von Texten.
+  - `LEADERSHIP`: `{training:[{key,name,desc,tendency,sure}], mental:[…]}` in der Reihenfolge der Karten im Spiel; `LEAD_MAX = {training:3, mental:2}`.
+  - `cleanLead(sel) -> {training:[key], mental:[key]}`: entfernt unbekannte Schlüssel und Doppelte, schneidet auf `LEAD_MAX` ab; `sel` darf `undefined` sein.
   - `coachHints(coaching, rated) -> [text]`: `coaching` = `{Bewertungsname: Textstufe}`, `rated` = Ergebnis von `areaRatings`.
-  - `tendencyHints(chosen, ctx) -> [{kind, text}]`: `ctx` = `{family, styleKey, avgAge}`, `kind` ∈ `'konflikt' | 'passt' | 'hinweis'`.
+  - `leadHints(sel, ctx) -> [{kind, text}]`: `sel` wie von `cleanLead`, `ctx` = `{family, styleKey, avgAge}`, `kind` ∈ `'konflikt' | 'passt' | 'hinweis'`.
 
-`TENDENCIES` (Startliste, wird nach dem Screenshot des Nutzers ergänzt): „Spielt offensiven Fußball“, „Spielt soliden Defensivfußball“, „Entwickelt Nachwuchsspieler“, „Verfolgt Jugendentwicklung aufmerksam“, „Taktiktüftler“, „Sehr ambitioniert“, „Allseits bekannter Erfolgstyp“.
+`LEADERSHIP` (Kartenname, Beschreibung wie im Spiel gekürzt, Tendenz; `sure:false` = Zuordnung nach dem Sinn, vom Nutzer zu bestätigen):
+
+| Gruppe | key | Karte | Tendenz | sure |
+|---|---|---|---|---|
+| training | `offensive` | Offensive | Spielt offensiven Fußball | true |
+| training | `defensiv` | Defensiv | Spielt soliden Defensivfußball | true |
+| training | `entwickler` | Entwickler | Entwickelt Nachwuchsspieler | true |
+| training | `energisch` | Energisch | Spielt dynamischen Fußball | true |
+| training | `entertainer` | Entertainer | Spielt unterhaltsamen Fußball | true |
+| training | `pragmatiker` | Pragmatiker | Spielt vertikalen Fußball | false |
+| training | `spezialist` | Spezialist | Spezialist | true |
+| training | `laptop` | Laptop-Trainer | Holt das Optimum aus Standardsituationen heraus | false |
+| training | `taktiker` | Taktiker | Taktiktüftler | false |
+| mental | `erfolgshungrig` | Erfolgshungrig | Sehr ambitioniert | false |
+| mental | `diszipliniert` | Diszipliniert | Absoluter Disziplinfanatiker | false |
+| mental | `belastbar` | Belastbar | Geborener Führungsspieler | false |
+| mental | `ueberzeugend` | Überzeugend | Leidenschaftlicher Motivator | false |
+| mental | `inspirierend` | Inspirierend | Inspiriert andere | false |
+| mental | `gut` | Gut | Allseits bekannter Erfolgstyp | false |
+
+Beschreibungen (`desc`, aus den Screenshots): Offensive „Attraktiver Offensivfußball.“, Defensiv „Die Null muss stehen.“, Entwickler „Junge Talente fördern.“, Energisch „Gegner mit flottem Tempo-Fußball überrennen.“, Entertainer „Ansehnlicher, packender Fußball für die Fans.“, Pragmatiker „Der schnellste und einfachste Weg zum Sieg.“, Spezialist „Fokus auf Torwarttraining und Fitness.“, Laptop-Trainer „Ballbesitzorientiert und bei Standards effektiv.“, Taktiker „Kleinste taktische Details.“, Erfolgshungrig „Zielstrebig, will alles selbst kontrollieren.“, Diszipliniert „Disziplin und hohe Standards.“, Belastbar „Steht nach Rückschlägen sofort wieder auf.“, Überzeugend „Reißt Menschen mit.“, Inspirierend „Starke, präsente Führungspersönlichkeit.“, Gut „Passt sich jeder Liga und jedem Land an.“
 
 `coachHints`: Für jeden Bereich mit `band === 'schwach'` und jede Bewertung in seinem `coach`, deren Stufe „Sehr schlecht“ oder „Schlecht“ ist: `'„<Bereich>“ ist schwach, und deine Trainerbewertung <Bewertung> ist „<Stufe>“ – einen Co-Trainer mit Stärke in <Bewertung> diese Einheit leiten lassen.'` Jede Kombination nur einmal; leere `coaching` → `[]`.
 
-`tendencyHints` (nur Texte, die in `TENDENCIES` stehen, zählen; andere werden ignoriert):
+`leadHints` (hängt am Kartenschlüssel, nicht am Tendenztext; Reihenfolge der Ausgabe wie in der Tabelle):
 
-| Tendenz | Bedingung | kind | text |
+| Karte | Bedingung | kind | text |
 |---|---|---|---|
-| Spielt soliden Defensivfußball | `family==='pressing'` oder `styleKey==='vertical_tikitaka'` | konflikt | „Hohes Pressing passt nicht zu deinem Ruf als Defensivtrainer – Spieler lassen sich davon schwerer überzeugen.“ |
-| Spielt offensiven Fußball | `family==='counter'` | konflikt | „Konterfußball aus tiefem Block passt nicht zum Ruf „Spielt offensiven Fußball“.“ |
-| Spielt offensiven Fußball | `family` ∈ possession, pressing, wide | passt | „Dein offensiver Ruf passt zum Spielstil – das hilft beim Überzeugen der Spieler.“ |
-| Entwickelt Nachwuchsspieler / Verfolgt Jugendentwicklung aufmerksam | `avgAge > 27` | hinweis | „Deine Startelf ist im Schnitt <avgAge, eine Nachkommastelle> Jahre alt – mehr junge Spieler einbauen passt zu deinem Ruf.“ |
-| Taktiktüftler | immer | passt | „Mehrere Taktiken für verschiedene Gegner einüben (Trainingseinheit „Geheimtraining“) passt zu deinem Ruf.“ |
+| `defensiv` | `family==='pressing'` oder `styleKey==='vertical_tikitaka'` | konflikt | „Hohes Pressing passt nicht zu deinem Ruf als Defensivtrainer – Spieler lassen sich davon schwerer überzeugen.“ |
+| `offensive` | `family==='counter'` | konflikt | „Konterfußball aus tiefem Block passt nicht zu deinem offensiven Ruf.“ |
+| `offensive` | `family` ∈ possession, pressing, wide | passt | „Dein offensiver Ruf passt zum Spielstil – das hilft beim Überzeugen der Spieler.“ |
+| `energisch` | `styleKey==='tikitaka'` | konflikt | „Geduldiges Tiki-Taka passt nicht zu deinem Ruf für flotten Tempo-Fußball.“ |
+| `energisch` | `family` ∈ pressing, counter, direct oder `styleKey==='vertical_tikitaka'` | passt | „Dein Ruf für Tempo-Fußball passt zum Spielstil.“ |
+| `laptop` | `family` ∈ counter, direct | konflikt | „Als Laptop-Trainer stehst du für Ballbesitz – dein Spielstil verzichtet darauf.“ |
+| `pragmatiker` | `styleKey==='tikitaka'` | konflikt | „Geduldiges Tiki-Taka passt nicht zu deinem Ruf, auf dem schnellsten Weg zum Sieg zu spielen.“ |
+| `entwickler` | `avgAge > 27` | hinweis | „Deine Startelf ist im Schnitt <avgAge, eine Nachkommastelle> Jahre alt – mehr junge Spieler einbauen passt zu deinem Ruf.“ |
+| `taktiker` | immer | passt | „Mehrere Taktiken für verschiedene Gegner einüben (Trainingseinheit „Geheimtraining“) passt zu deinem Ruf.“ |
 
 - [ ] **Step 1: Failing tests**
 
@@ -261,36 +286,46 @@ test('coachHints: schwacher Bereich plus schwache Bewertung', () => {
   assert.deepEqual(h, ['„Pressingintensität“ ist schwach, und deine Trainerbewertung Fitness ist „Schlecht“ – einen Co-Trainer mit Stärke in Fitness diese Einheit leiten lassen.']);
   assert.deepEqual(T.coachHints({}, rated), []);
 });
-test('tendencyHints: Konflikt, Passung, Alter, unbekannte Texte ignoriert', () => {
-  const k = T.tendencyHints(['Spielt soliden Defensivfußball','Gibt es nicht'], {family:'possession',styleKey:'vertical_tikitaka',avgAge:25});
-  assert.deepEqual(k.map(x=>x.kind), ['konflikt']);
-  assert.deepEqual(T.tendencyHints(['Spielt offensiven Fußball'], {family:'counter',styleKey:'counter',avgAge:25}).map(x=>x.kind), ['konflikt']);
-  const y = T.tendencyHints(['Entwickelt Nachwuchsspieler'], {family:'possession',styleKey:'tikitaka',avgAge:28.44});
+test('LEADERSHIP: 9 Trainings- und 6 Mentalkarten, Grenzen 3 und 2', () => {
+  assert.equal(T.LEADERSHIP.training.length, 9); assert.equal(T.LEADERSHIP.mental.length, 6);
+  assert.deepEqual(T.LEAD_MAX, {training:3, mental:2});
+  assert.equal(T.LEADERSHIP.training.find(c=>c.key==='defensiv').tendency, 'Spielt soliden Defensivfußball');
+});
+test('cleanLead: unbekannte und überzählige Karten fallen weg', () => {
+  assert.deepEqual(T.cleanLead(undefined), {training:[], mental:[]});
+  assert.deepEqual(T.cleanLead({training:['offensive','gibtsnicht','offensive','entwickler','energisch','taktiker'], mental:['gut','belastbar','diszipliniert']}),
+    {training:['offensive','entwickler','energisch'], mental:['gut','belastbar']});
+});
+test('leadHints: Konflikt, Passung, Alter', () => {
+  const sel = t => ({training:t, mental:[]});
+  assert.deepEqual(T.leadHints(sel(['defensiv']), {family:'possession',styleKey:'vertical_tikitaka',avgAge:25}).map(x=>x.kind), ['konflikt']);
+  assert.deepEqual(T.leadHints(sel(['offensive']), {family:'counter',styleKey:'counter',avgAge:25}).map(x=>x.kind), ['konflikt']);
+  const y = T.leadHints(sel(['entwickler']), {family:'possession',styleKey:'tikitaka',avgAge:28.44});
   assert.equal(y[0].text, 'Deine Startelf ist im Schnitt 28,4 Jahre alt – mehr junge Spieler einbauen passt zu deinem Ruf.');
-  assert.deepEqual(T.tendencyHints([], {family:'pressing',styleKey:'gegenpress',avgAge:30}), []);
+  assert.deepEqual(T.leadHints(sel([]), {family:'pressing',styleKey:'gegenpress',avgAge:30}), []);
 });
 ```
 
 - [ ] **Step 2: Fehlschlag prüfen** (`node --test tests/js/`)
 
-- [ ] **Step 3: Implementieren** (`TENDENCIES`, `coachHints`, `tendencyHints` an `api`). Zahlen im Text mit Komma (`toLocaleString('de-DE',{maximumFractionDigits:1, minimumFractionDigits:1})`).
+- [ ] **Step 3: Implementieren** (`LEADERSHIP`, `LEAD_MAX`, `cleanLead`, `coachHints`, `leadHints` an `api`). Zahlen im Text mit Komma (`toLocaleString('de-DE',{maximumFractionDigits:1, minimumFractionDigits:1})`).
 
 - [ ] **Step 4: Karte „Trainer“ in `vTaktik`**
   - Zwei Spalten mit allen Bewertungen aus `DATA.coach.coaching` und `DATA.coach.mental`: Name und Textstufe als Pille (Sehr schlecht/Schlecht `pill b`, Durchschnitt `pill`, Gut `pill a`, Sehr gut/Herausragend/Elite `pill g`). Keine Zahlen.
   - Darunter `coachHints(...)` als Liste. Ohne Bewertungen entfallen Tabelle und Hinweise (Spec 8.4); an ihrer Stelle steht nur „Im Spielstand wurden keine Trainerbewertungen gefunden.“
-  - **Tendenzen:** Überschrift „Deine Trainertendenzen (wie im Trainerprofil im Spiel)“, alle `TENDENCIES` als anklickbare Pillen (gewählt `pill a`, sonst `pill`); Klick schaltet um, speichert in `S.tend` (Array), `save()`, `render()`. `load()` setzt `S.tend` auf `[]`, wenn es fehlt, und entfernt Einträge, die nicht in `TENDENCIES` stehen. Ist `S.tend` leer und `DATA.coach.tendencies` (aus `config.json`) gesetzt, gelten diese als Vorauswahl, ohne gespeichert zu werden.
-  - Darunter `tendencyHints(S.tend, {family: STYLES[S.style].family, styleKey: S.style, avgAge})` mit `avgAge` = Durchschnittsalter der besetzten Startelfplätze; Konflikt mit `<span class="warn">Widerspruch:</span>`, Passung mit `<span class="good">Passt:</span>`, Hinweis ohne Präfix. Ohne Auswahl: „Wähle deine Tendenzen aus, dann prüft Co-Trainer, ob Taktik und Ruf zusammenpassen.“
-  - Die bisherigen Einträge der alten Liste, die auf `c.style`, `c.preferred_system` oder Tendenz-Regex beruhten, entfallen; die Hinweise zu Motivationsfähigkeit und Autorität (aus `c.mental`) bleiben.
+  - **Führungsstil:** Überschrift „Dein Führungsstil (wie unter „Ihr Stil“ im Spiel)“, zwei Gruppen „Training (3 wählen)“ und „Mentales (2 wählen)“. Jede Karte als anklickbares Kästchen mit Name, `desc` und der Tendenz klein darunter (bei `sure:false` mit dem Zusatz „(Zuordnung vermutet)“); gewählt mit Akzentrand. Klick schaltet um; ist die Gruppe schon voll, ersetzt der Klick die zuerst gewählte Karte der Gruppe. Gespeichert in `S.lead`, `save()`, `render()`. `load()` setzt `S.lead = TAKTIK.cleanLead(s.lead)`.
+  - Darunter die Tendenzen der gewählten Karten als Pillen („Tendenzen im Profil“) und `leadHints(S.lead, {family: STYLES[S.style].family, styleKey: S.style, avgAge})` mit `avgAge` = Durchschnittsalter der besetzten Startelfplätze; Konflikt mit `<span class="warn">Widerspruch:</span>`, Passung mit `<span class="good">Passt:</span>`, Hinweis ohne Präfix. Ohne Auswahl: „Wähle deinen Führungsstil wie im Spiel, dann prüft Co-Trainer, ob Taktik und Ruf zusammenpassen.“
+  - Die bisherigen Einträge der alten Liste, die auf `c.style`, `c.preferred_system`, `c.tendencies` oder Tendenz-Regex beruhten, entfallen; die Hinweise zu Motivationsfähigkeit und Autorität (aus `c.mental`) bleiben.
 
 - [ ] **Step 5: Tests laufen lassen** (`.venv\Scripts\python -m pytest tests -q -m "not save"`, alle grün)
 
-- [ ] **Step 6: Im Browser prüfen**: 15 Bewertungen als Pillen (Ravenna), Tendenz anklicken → Neuladen → bleibt gewählt; „Spielt soliden Defensivfußball“ bei Vertikalem Tiki-Taka zeigt „Widerspruch“. In der Konsole kein Fehler. Mit `DATA.coach={}` (im Entwicklermodus per Konsole gesetzt, dann `render()`) erscheint der Hinweistext ohne Fehler.
+- [ ] **Step 6: Im Browser prüfen**: 15 Bewertungen als Pillen (Ravenna); Karten wählen → Neuladen → bleibt gewählt; eine vierte Trainingskarte ersetzt die erste; „Defensiv“ bei Vertikalem Tiki-Taka zeigt „Widerspruch“. In der Konsole kein Fehler. Mit `DATA.coach={}` (im Entwicklermodus per Konsole gesetzt, dann `render()`) erscheint der Hinweistext ohne Fehler.
 
 - [ ] **Step 7: Commit**
 
 ```bash
 git add cotrainer/ui/taktik.js cotrainer/ui/index.html tests/js/taktik.test.mjs
-git commit -m "Taktik: Trainerbewertungen als Textstufen, Tendenzen pro Karriere"
+git commit -m "Taktik: Trainerbewertungen als Textstufen, Führungsstil pro Karriere"
 ```
 
 ---
@@ -322,7 +357,7 @@ git commit -m "Taktik: Trainerbewertungen als Textstufen, Tendenzen pro Karriere
   - In Stufe „Aus“ erscheint der neue Grund, und die Reihenfolge der Zeilen ist mit und ohne Filter dieselbe (nur weniger Zeilen).
 
 - [ ] **Step 5: Dokumentation**
-  - `HANDOFF.md`: neuer Punkt 19 unter „Was bisher gemacht wurde“ (Teil 3: Reiter Taktik, `taktik.js`, Bereiche-Tabelle mit Rechenregel, Tendenzen pro Karriere, Verknüpfung mit Training und Transfers); unter „Nächste Schritte“ Teil 3 als erledigt; unter „Vom Nutzer zu bestätigen“: vollständige Tendenzliste per Screenshot; die Einschätzung der Bereiche mit dem Bildschirm „Taktische Effektivität“ im Spiel vergleichen.
+  - `HANDOFF.md`: neuer Punkt 19 unter „Was bisher gemacht wurde“ (Teil 3: Reiter Taktik, `taktik.js`, Bereiche-Tabelle mit Rechenregel, Führungsstil pro Karriere, Verknüpfung mit Training und Transfers); unter „Nächste Schritte“ Teil 3 als erledigt; unter „Vom Nutzer zu bestätigen“: die Zuordnung Karte → Tendenz bei den Karten mit `sure:false`; ob der gewählte Führungsstil im Spielstand steht (dann könnte Co-Trainer ihn lesen); die Einschätzung der Bereiche mit dem Bildschirm „Taktische Effektivität“ im Spiel vergleichen.
   - `CLAUDE.md`: unter „Tests“ ergänzen, dass `tests/js/` Node.js braucht und ohne Node übersprungen wird; unter „Oberfläche“, dass die Taktiklogik in `cotrainer/ui/taktik.js` liegt.
 
 - [ ] **Step 6: `.exe` bauen und starten**
