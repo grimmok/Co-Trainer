@@ -259,6 +259,43 @@ def test_scout_context_needs_own_league_for_league_areas():
     assert X.scout_context(None, 776, 22, tiers, comps, geo, {}) == (None, X.SCOUT_NOTE_MISSING)
 
 
+def test_willingness_uses_club_reputation():
+    cm = {1: dict(rep=4300), 2: dict(rep=7100), 3: dict(rep=4000), 4: dict(rep=0), 5: dict()}
+    assert X.club_rep_diff(2, 1, cm) == 56                       # Serie A gegen Serie C
+    assert X.club_rep_diff(4, 1, cm) == X.club_rep_diff(5, 1, cm) == X.club_rep_diff(9, 1, cm) == 0
+    assert X.club_rep_diff(2, 4, cm) == 0                        # eigene Reputation unbekannt: neutral
+    assert X.club_rep_diff(0, 1, cm) == X.FREE_AGENT_DIFF
+
+    def will(club, free=False):
+        return X.willingness_score(X.club_rep_diff(club, 1, cm), free, [10, 15, 12] + [10] * 5, 2.0, 26)
+    assert will(2) < will(4) < will(3)                           # größerer Verein → geringere Chance
+    assert will(4) == will(5) == will(1)                         # unbekannt = gleich groß
+    assert will(0, free=True) > will(3)
+
+
+def test_vis_selection_ignores_ca_and_pa():
+    import random
+    rnd = random.Random(7)
+    area = [dict(id=i, ca=rnd.randint(40, 160), pa=rnd.randint(60, 190)) for i in range(400)]
+    will = {pl['id']: rnd.randint(2, 97) for pl in area}
+    con = {pl['id']: dict(end=None if pl['id'] % 9 == 0 else f'202{pl["id"] % 5 + 6}-06-30') for pl in area}
+
+    def run():
+        out = X.select_pool(area, will, con, lambda pl: 80 <= pl['ca'] <= 130, lambda pl: -pl['ca'],
+                            vis_n=100, quality_n=80)
+        return [pl['id'] for pl, v in out if v], [pl['id'] for pl, v in out if not v]
+    vis1, qual1 = run()
+    cas, pas = [pl['ca'] for pl in area], [pl['pa'] for pl in area]
+    rnd.shuffle(cas); rnd.shuffle(pas)
+    for pl, ca, pa in zip(area, cas, pas):
+        pl['ca'], pl['pa'] = ca, pa
+    vis2, qual2 = run()
+    assert len(vis1) == 100 and vis1 == vis2                      # Auswahl und Reihenfolge gleich
+    assert qual1 != qual2 and not set(vis1) & set(qual1)          # Qualitätsteil darf sich ändern, keine Doppelten
+    w = [will[i] for i in vis1]
+    assert w == sorted(w, reverse=True)
+
+
 @pytest.mark.save
 def test_ravenna_scout_area(ravenna_data):
     m = ravenna_data['meta']
