@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><title>Co-Trainer 1.0</title>
+<style>
+:root{--canvas:#eceee9;--text:#1c2128;--muted:#5b6673;--line:#cfd5dc;--acc:#0e7a45;--acc-soft:#dcebe2}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:2000px;height:1125px;background:var(--canvas);overflow:hidden}
+body{position:relative;font-family:"Segoe UI",system-ui,sans-serif;color:var(--text)}
+
+.left{position:absolute;left:96px;top:92px;width:640px}
+.brand{display:flex;align-items:center;gap:16px}
+.logo{width:56px;height:56px;border-radius:14px;background:var(--acc);color:#fff;display:grid;place-items:center;font:700 23px/1 "Segoe UI",sans-serif}
+.word{font:700 36px/1 "Segoe UI",sans-serif}
+.badge{margin-left:8px;font:600 21px/1 "Segoe UI",sans-serif;color:var(--acc);background:var(--acc-soft);border-radius:999px;padding:9px 16px 10px}
+h1{margin-top:64px;font:600 68px/1.08 "Segoe UI",sans-serif;letter-spacing:-.015em}
+.sub{margin-top:28px;font-size:28px;line-height:1.45;color:var(--muted)}
+ol{list-style:none;margin-top:44px;display:grid;gap:22px}
+ol li{display:grid;grid-template-columns:44px 1fr;gap:18px;align-items:start;font-size:27px;line-height:1.35}
+ol li b{font-weight:600}
+.n{width:44px;height:44px;border-radius:50%;background:var(--acc);color:#fff;display:grid;place-items:center;font:700 22px/1 "Segoe UI",sans-serif;margin-top:-3px}
+.more{margin-top:22px;font-size:23px;color:var(--muted);padding-left:62px}
+.foot{position:absolute;left:96px;bottom:74px;font-size:24px;color:var(--muted)}
+.foot .url{display:block;margin-top:8px;font:600 36px/1.2 "Segoe UI",sans-serif;color:var(--text)}
+
+/* Programmfenster wie unter Windows */
+.win{position:absolute;left:806px;top:128px;width:1154px;height:880px;background:#f5f6f8;border:1px solid #c3cad2;border-radius:10px;overflow:hidden;
+  box-shadow:0 30px 70px rgba(28,33,40,.16),0 6px 18px rgba(28,33,40,.08)}
+.bar{height:42px;background:#ffffff;border-bottom:1px solid #e3e6ea;display:flex;align-items:center;padding-left:16px;font-size:17px;color:#3b4651}
+.bar .ic{width:20px;height:20px;border-radius:5px;background:var(--acc);color:#fff;display:grid;place-items:center;font:700 9px/1 "Segoe UI";margin-right:10px}
+.bar .ctl{margin-left:auto;display:flex}
+.bar .ctl span{width:58px;height:42px;display:grid;place-items:center;color:#3b4651;font-size:15px}
+.win img{display:block;width:1152px}
+
+.mk{position:absolute;width:52px;height:52px;border-radius:50%;background:var(--acc);color:#fff;display:grid;place-items:center;
+  font:700 25px/1 "Segoe UI",sans-serif;border:4px solid #fff;box-shadow:0 4px 12px rgba(0,0,0,.18);z-index:3}
+</style></head>
+<body>
+<div class="left">
+  <div class="brand"><div class="logo">CT</div><div class="word">Co-Trainer</div><div class="badge">Version 1.0 · jetzt verfügbar</div></div>
+  <h1>Dein Co-Trainer für Football&nbsp;Manager&nbsp;27.</h1>
+  <p class="sub">Liest deinen Spielstand und zeigt, wo es in Kader, Taktik und Training hakt – und was hilft.</p>
+  <ol>
+    <li><span class="n">1</span><span><b>Beste Startelf</b> für deine Taktik, mit Eignung je Position</span></li>
+    <li><span class="n">2</span><span><b>Schwachstellen</b> erkennen und passende Kandidaten finden</span></li>
+    <li><span class="n">3</span><span><b>Was dein Spielstil verlangt</b> – und wo dein Kader zurückliegt</span></li>
+  </ol>
+  <p class="more">Außerdem: Taktik-Baustellen, Trainingswoche, Transfervorschläge mit Spoilerschutz.</p>
+</div>
+
+<div class="foot">Kostenlos für Windows · liest nur, ohne Internet
+  <span class="url">github.com/grimmok/Co-Trainer</span></div>
+
+<div class="win">
+  <div class="bar"><span class="ic">CT</span>Co-Trainer · Ravenna · Serie C/B<span class="ctl"><span>&#x2014;</span><span>&#x2610;</span><span>&#x2715;</span></span></div>
+  <img src="kaderanalyse-hell.png" alt="">
+</div>
+<div class="mk" style="left:986px;top:380px">1</div>
+<div class="mk" style="left:1416px;top:384px">2</div>
+<div class="mk" style="left:1416px;top:608px">3</div>
+</body></html>

@@ -155,6 +155,11 @@ Nutzerdaten:
     - Geprüft: gebaute `.exe` gestartet und über den WebView2-Debugport (`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=…`) `API.about()` aufgerufen: Version 1.0.0, Liste vollständig. Dieser Weg eignet sich allgemein, um die echte `.exe` automatisch zu prüfen.
     - Abschließende Durchsicht durch einen frischen Reviewer: zwei wichtige Funde (fehlende Lizenzen für DLLs und PyInstaller, setuptools in der `.exe`) behoben. Zurückgestellt: `build.ps1` erzeugt die Lizenzliste erst nach den Tests (nach einem Paket-Update scheitert der Build deshalb an `test_checked_in_notices_match_installed_versions`; dann zuerst `.venv\Scripts\python tools\third_party.py` ausführen); `tools/third_party.py` prüft nicht, ob `cotrainer` installiert ist; `about.notices_text` fängt keinen Dekodierfehler.
 
+22. **Release-Unterlagen (15.11. spät): `docs/release/`.**
+    - `ankuendigung-1.0.md`: Ankündigungstext (z. B. für den Discord) mit Funktionen, Download-Link, Windows-Schutzhinweis und Plänen.
+    - `vorschau-1.0.png` (2000×1125): Vorschaubild, erzeugt aus `vorschau-1.0.html` mit dem Bildschirmfoto `kaderanalyse-hell.png` (Kaderanalyse im hellen Schema, Entwicklermodus). Der Render-Befehl steht in `ankuendigung-1.0.md` und ist geprüft.
+    - Gestaltung bewusst eigenständig (Wunsch des Nutzers: nicht zu nah an einer fremden Vorlage, „ohne AI-Slop“): helles Schema, ein gerades Programmfenster mit Windows-Titelleiste, nummerierte Markierungen auf echten Funktionen mit Legende, keine gekippten Kartenstapel, Etiketten oder Glow-Effekte. Ein dunkler erster Entwurf im Stil der Vorlage wurde verworfen.
+
 ## Erkenntnisse zum Spielstand-Format
 
 ### Container
@@ -374,17 +379,26 @@ Grundlage: `Trainertest 2.fm` (unverändert) gegen `Trainertest 2 traainer.fm` (
 
 ## Nächste Schritte
 
-### Als Nächstes (Stand 15.11. abends, `main` = Teile 1–4, Version 1.0.0, Release `v1.0.0` auf GitHub, 150 Tests grün)
+### Als Nächstes (Stand 15.11. spät, `main` = Version 1.0.0, Release `v1.0.0` auf GitHub, Repo noch privat, 150 Tests grün)
 
-1. ~~GitHub einrichten~~ erledigt am 15.11.: Remote `origin` = https://github.com/grimmok/Co-Trainer (privat, MIT-Lizenz aus GitHub übernommen), `main` verfolgt `origin/main`.
+1. **Veröffentlichen (macht der Nutzer selbst):**
+   - Repository öffentlich schalten (GitHub → Settings → General → „Change repository visibility“). Erst dann funktionieren README, Release-Link und Ankündigung für andere.
+   - Vorher durchsehen, was damit öffentlich wird: `config.json` (Karrieredaten aus dem Spiel), `HANDOFF.md`, Spec und Pläne (Arbeitsnotizen mit Karriere- und Spielernamen), `docs/release/kaderanalyse-hell.png` (Ravenna-Kader). Name, private E-Mail und Benutzerpfade sind aus der ganzen Historie entfernt (Punkt 6).
+   - Ankündigung posten: Text und Vorschaubild liegen in `docs/release/` (Punkt 22).
+   - Danach aufräumen: lokale Zweige `backup-vor-noreply` und `backup-vor-grimmok` sowie `refs/original` löschen (sie enthalten noch Name und private Adresse, werden aber nie gepusht); den gemergten Remote-Zweig `teil-4-release` löschen.
+2. **Rollentest (B.1)** hat Vorrang bei der Dekodierung: bei Osijek sind 17 von 22 Rollen unbekannt, bei „Ravenna 2 spieltaktik“ (5-2-3) 20. Braucht Testspielstände mit der ausgefüllten Rollenliste des Nutzers.
+3. **Version 1.0.1 (Kleinigkeiten):**
+   - Durchschnitte stehen mit Punkt statt Komma: Trainingswoche („Ø 10.4“), Taktik-Reiter, Tabelle „Was dein Spielstil verlangt“ in der Kaderanalyse („11.5“).
+   - Aus der Durchsicht von Teil 4 zurückgestellt: `build.ps1` erzeugt die Lizenzliste erst nach den Tests (nach einem Paket-Update scheitert der Build an `test_checked_in_notices_match_installed_versions`; bis dahin vorher `.venv\Scripts\python tools\third_party.py` ausführen); `tools/third_party.py` prüft nicht, ob `cotrainer` installiert ist; `about.notices_text` fängt keinen Dekodierfehler, `openAbout` hat kein try/catch.
+   - Nach `.\build.ps1` meldet git `THIRD_PARTY_LICENSES.txt` als geändert, obwohl nur die Zeilenenden abweichen (das Skript schreibt LF, git checkt mit CRLF aus). Abhilfe: `.gitattributes` mit `THIRD_PARTY_LICENSES.txt text eol=lf`.
+   - Release-Ablauf: Version in `pyproject.toml` und `cotrainer/__init__.py` erhöhen, `.\build.ps1`, SHA-256 mit `Get-FileHash dist\Co-Trainer.exe`, `gh release create vX.Y.Z dist\Co-Trainer.exe --notes-file …` (Token wie in Punkt 6). Release-Text von `v1.0.0` als Vorlage: `gh release view v1.0.0`.
+4. **Vom Nutzer zu bestätigen:** siehe A.7 (offen: Konter-/Ballbesitz-Annäherungen der Stil-Codes, Karte → Tendenz bei `sure:false`, Bereiche und Baustellen-Grenze 0,3 gegen „Taktische Effektivität“, ob in „2 spieltaktik“ die 5-2-3-Taktik die Spieltaktik ist, Stufengrenzen der Trainerbewertungen, Name „Co-Trainer“).
+5. **Mögliche Verbesserungen:** Teamanweisungen aus dem Taktikkopf dekodieren (B.3), Zwischenspeicher fürs Einlesen (zurzeit rund zwei Minuten), Wechselchance für frisch gewechselte Spieler (`club_join_date` unklar), Ligen ohne Namen („Wettbewerb 6026“), „Kein Scouting“ (welche Spieler den Mitarbeitern bekannt sind), signierte `.exe` (entfernt den Windows-Schutzhinweis, kostet ein Zertifikat).
+6. **Stand GitHub und Release (zum Nachschlagen).** GitHub eingerichtet am 15.11.: Remote `origin` = https://github.com/grimmok/Co-Trainer (privat, MIT-Lizenz aus GitHub übernommen), `main` verfolgt `origin/main`.
    - **Persönliche Daten aus der ganzen Historie entfernt** (Entscheidung des Nutzers, 15.11.): Autor und Committer heißen `grimmok` mit der noreply-Adresse `317344714+grimmok@users.noreply.github.com` (auch der von GitHub angelegte Startcommit); Benutzerpfade stehen als `%USERPROFILE%\…`, der Vorname ist entfernt. Danach Force-Push. `user.email` des Projekts steht auf der noreply-Adresse, `user.name` sollte für neue Commits ebenfalls `grimmok` sein. Die lokalen Zweige `backup-vor-noreply` und `backup-vor-grimmok` (und `refs/original`) halten die alten Stände mit den privaten Angaben; sie werden nie gepusht und können gelöscht werden.
    - `gh` ist weiter nicht angemeldet. Der Token steht in der Benutzervariable `GITHUB_PERSONAL_ACCESS_TOKEN`; Claude pusht damit über einen einmaligen `http.extraheader` (nichts gespeichert). Der GitHub-MCP-Server sieht den Token erst nach einem Neustart von Claude Code.
    - Das Repository bleibt privat, bis der Nutzer es selbst öffentlich schaltet (Entscheidung 15.11.). `config.json` (Karrieredaten aus dem Spiel, Entwicklerhilfe) ist eingecheckt.
-2. ~~Teil 4~~ erledigt (Punkt 21): PR #1 gemergt, Release https://github.com/grimmok/Co-Trainer/releases/tag/v1.0.0 mit `Co-Trainer.exe` (12,1 MB, SHA-256 `49a46e96ee0c382ee1bf05e243a10fa73df88f6f08bbe0ad8174b03ce106a19b`). Das Repo ist privat; öffentlich schaltet der Nutzer selbst (dann sind README und Release für den Discord nutzbar). Für das nächste Release: Version in `pyproject.toml` und `cotrainer/__init__.py` erhöhen, `.\build.ps1`, `gh release create`.
-3. **Rollentest (B.1)** hat Vorrang bei der Dekodierung: bei Osijek sind 17 von 22 Rollen unbekannt, bei „Ravenna 2 spieltaktik“ (5-2-3) 20.
-4. **Vom Nutzer zu bestätigen:** siehe A.7 (offen: Konter-/Ballbesitz-Annäherungen der Stil-Codes, Karte → Tendenz bei `sure:false`, Bereiche und Baustellen-Grenze 0,3 gegen „Taktische Effektivität“, ob in „2 spieltaktik“ die 5-2-3-Taktik die Spieltaktik ist, Stufengrenzen der Trainerbewertungen, Name „Co-Trainer“).
-5. ~~Zurückgestellte Kleinigkeiten aus Teil 3~~ erledigt (Punkt 20). Aufgefallen: Durchschnitte im Training und im Taktik-Reiter stehen mit Punkt statt Komma (z. B. „Ø 10.4“).
-6. **Mögliche Verbesserungen:** Wechselchance für frisch gewechselte Spieler (`club_join_date` unklar), Ligen ohne Namen („Wettbewerb 6026“), „Kein Scouting“ (welche Spieler den Mitarbeitern bekannt sind), Zwischenspeicher fürs Einlesen.
+   - Teil 4 erledigt (Punkt 21): PR #1 gemergt, Release https://github.com/grimmok/Co-Trainer/releases/tag/v1.0.0 mit `Co-Trainer.exe` (12,1 MB, SHA-256 `49a46e96ee0c382ee1bf05e243a10fa73df88f6f08bbe0ad8174b03ce106a19b`). Das Repo ist privat; öffentlich schaltet der Nutzer selbst (dann sind README und Release für den Discord nutzbar). Für das nächste Release: Version in `pyproject.toml` und `cotrainer/__init__.py` erhöhen, `.\build.ps1`, `gh release create`.
 
 ### A. Umbau zum Programm „Co-Trainer“ (Vorrang)
 
