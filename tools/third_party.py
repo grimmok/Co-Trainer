@@ -1,0 +1,113 @@
+"""Sammelt die Lizenztexte aller Pakete, die in Co-Trainer.exe gebündelt werden, plus Python.
+
+Aufruf (aus dem Projektordner, mit der Entwicklungsumgebung): .venv\\Scripts\\python tools\\third_party.py
+Schreibt THIRD_PARTY_LICENSES.txt; build.ps1 ruft das vor dem Bauen auf und packt die Datei mit ein.
+"""
+import importlib.metadata as md
+import os
+import platform
+import re
+import sys
+
+from packaging.markers import Marker
+
+RULE = '=' * 70
+HEAD = ('Co-Trainer – Lizenzen der mitgelieferten Software\n\n'
+        'Co-Trainer selbst steht unter der MIT-Lizenz (siehe LICENSE).\n'
+        'Die Datei Co-Trainer.exe enthält außerdem die folgenden Pakete.\n')
+LICENSE_FILE = re.compile(r'(^|/)(LICEN[CS]E|COPYING|NOTICE)[^/]*$', re.I)
+
+
+def _norm(name):
+    return re.sub(r'[-_.]+', '-', name).lower()
+
+
+def runtime_dists(root='cotrainer'):
+    """Transitive Laufzeitabhängigkeiten von root (ohne root selbst), ohne Extras, jede einmal."""
+    seen, out, todo = set(), [], [root]
+    while todo:
+        name = todo.pop(0)
+        key = _norm(name)
+        if key in seen:
+            continue
+        seen.add(key)
+        try:
+            dist = md.distribution(name)
+        except md.PackageNotFoundError:
+            continue
+        if key != _norm(root):
+            out.append(dist)
+        for req in dist.requires or []:
+            spec, _, marker = req.partition(';')
+            if marker.strip() and not Marker(marker).evaluate({'extra': ''}):
+                continue
+            todo.append(re.split(r'[\s<>=!~\[(]', spec.strip(), maxsplit=1)[0])
+    return out
+
+
+def _license_files(dist):
+    files = [f for f in dist.files or [] if '.dist-info/' in str(f).replace('\\', '/')]
+    lic = [f for f in files if '/licenses/' in str(f).replace('\\', '/')]
+    return lic or [f for f in files if LICENSE_FILE.search(str(f).replace('\\', '/'))]
+
+
+def _project_url(dist):
+    m = dist.metadata
+    if m.get('Home-page'):
+        return m['Home-page']
+    urls = m.get_all('Project-URL') or []
+    return urls[0].split(',', 1)[-1].strip() if urls else 'unbekannt'
+
+
+def _metadata_license(dist):
+    m = dist.metadata
+    if m.get('License-Expression'):
+        return m['License-Expression'].strip()
+    if (m.get('License') or '').strip():
+        return m['License'].strip().splitlines()[0][:60]
+    cls = [c.split('::')[-1].strip() for c in m.get_all('Classifier') or [] if c.startswith('License ::')]
+    return cls[0] if cls else None
+
+
+def license_text(dist):
+    """Lizenztext aus den Dateien des Pakets; ohne Datei ein Hinweis mit Lizenz laut Paketangaben und Projekt."""
+    texts = [dist.locate_file(f).read_text(encoding='utf-8', errors='replace').strip() for f in _license_files(dist)]
+    if texts:
+        return '\n\n'.join(texts)
+    return (f'Kein Lizenztext im Paket enthalten. Lizenz laut Paketangaben: {_metadata_license(dist) or "unbekannt"}. '
+            f'Projekt: {_project_url(dist)}')
+
+
+def license_name(dist):
+    """Kurzname für den Blockkopf; schweigen die Paketangaben, wird der MIT-Wortlaut erkannt."""
+    name = _metadata_license(dist)
+    if name:
+        return name
+    return 'MIT' if 'Permission is hereby granted, free of charge' in license_text(dist) else 'unbekannt'
+
+
+def _block(title, text):
+    return f'{RULE}\n{title}\n{RULE}\n{text.strip()}\n'
+
+
+def render(dists, python_version, python_license):
+    first = [d for d in dists if _norm(d.metadata['Name']) == 'fmsave']
+    rest = sorted((d for d in dists if d not in first), key=lambda d: d.metadata['Name'].lower())
+    parts = [HEAD]
+    for d in first + rest:
+        parts.append(_block(f"{d.metadata['Name']} {d.version} – {license_name(d)}", license_text(d)))
+    parts.append(_block(f'Python {python_version} – PSF-2.0', python_license))
+    return '\n'.join(parts)
+
+
+def main(out='THIRD_PARTY_LICENSES.txt'):
+    with open(os.path.join(sys.base_prefix, 'LICENSE.txt'), encoding='utf-8') as fh:
+        py_license = fh.read()
+    text = render(runtime_dists(), platform.python_version(), py_license)
+    with open(out, 'w', encoding='utf-8', newline='\n') as fh:
+        fh.write(text)
+    print('Geschrieben:', out)
+
+
+if __name__ == '__main__':
+    main()
