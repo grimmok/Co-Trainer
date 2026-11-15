@@ -51,7 +51,35 @@
     });
   }
 
-  const api = {AREAS, areaRatings};
+  // Abhilfe für einen Verursacher: bessere Rolle, Training, Transfer (in dieser Reihenfolge).
+  function helpFor(area, causer, player, slot, roles, names) {
+    const out = [];
+    const mean = (r) => {
+      const v = ((r && r.key) || []).map(k => player.a && player.a[k]).filter(x => x !== undefined && x !== null);
+      return v.length ? v.reduce((t, x) => t + x, 0) / v.length : null;
+    };
+    const curId = slot[area.phase], cur = (roles || {})[curId];
+    const curMean = mean(cur);
+    let best = null, bestMean = null;
+    for (const [id, r] of Object.entries(roles || {})) {
+      if (id === curId || !r.pos.includes(slot.pos) || !(r.ph === area.phase || r.ph === 'both')) continue;
+      const m = mean(r);
+      if (m !== null && (bestMean === null || m > bestMean)) { best = {id, r}; bestMean = m; }
+    }
+    if (best && curMean !== null && bestMean >= curMean + 1.0)
+      out.push({kind: 'rolle', role: best.id, text: 'Rolle „' + best.r.name + '“ statt „' + (cur ? cur.name : curId) + '“ – passt besser zu seinen Stärken'});
+    const attrs = AREAS.find(x => x.key === area.key).attrs;
+    let weakest = causer && causer.weak && causer.weak[0] ? causer.weak[0][0] : null;
+    if (!weakest) {
+      const have = attrs.filter(k => player.a && player.a[k] !== undefined && player.a[k] !== null);
+      weakest = have.sort((x, y) => player.a[x] - player.a[y])[0] || attrs[0];
+    }
+    out.push({kind: 'training', text: 'Trainingseinheit „' + area.name + '“ einplanen; individueller Trainingsfokus auf ' + ((names && names[weakest]) || weakest)});
+    out.push({kind: 'transfer', text: 'Transfervorschläge für diese Position ansehen'});
+    return out;
+  }
+
+  const api = {AREAS, areaRatings, helpFor};
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.TAKTIK = api;
 })(this);

@@ -44,3 +44,21 @@ test('Attribute ohne Wert zählen nicht', () => {
   const r = T.areaRatings([{i:0,pos:'MC',ip:'cm',oop:'pcm',player:pl(1,{Wor:14,Sta:14})}], ROLES);
   assert.equal(r.find(x=>x.key==='intens').avg, 14);
 });
+
+test('helpFor schlägt eine besser passende Rolle derselben Phase vor', () => {
+  const R2 = {...ROLES, scm:{name:'Abschirmender Achter',ph:'oop',pos:['MC'],key:['Pos','Dec','Mar']}};
+  const a = {...all(8), Pos:16, Dec:16, Mar:16};
+  const slot = {i:0,pos:'MC',ip:'cm',oop:'pcm'};
+  const area = T.areaRatings([{...slot,player:pl(1,a)}], R2).find(x=>x.key==='intens');
+  const h = T.helpFor(area, area.causers[0], pl(1,a), slot, R2, {Wor:'Laufbereitschaft'});
+  assert.deepEqual(h.map(x=>x.kind), ['rolle','training','transfer']);
+  assert.equal(h[0].role, 'scm');
+  assert.equal(h[0].text, 'Rolle „Abschirmender Achter“ statt „Pressing-Achter“ – passt besser zu seinen Stärken');
+});
+test('helpFor ohne bessere Rolle: nur Training und Transfer', () => {
+  const slot = {i:0,pos:'MC',ip:'cm',oop:'pcm'};
+  const area = T.areaRatings([{...slot,player:pl(1,all(8))}], ROLES).find(x=>x.key==='intens');
+  const h = T.helpFor(area, area.causers[0], pl(1,all(8)), slot, ROLES);
+  assert.deepEqual(h.map(x=>x.kind), ['training','transfer']);
+  assert.match(h[0].text, /^Trainingseinheit „Pressingintensität“ einplanen; individueller Trainingsfokus auf /);
+});

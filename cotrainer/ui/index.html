@@ -295,7 +295,7 @@ function cls(sc,avg){if(sc==null)return'bad';return sc>=avg+4?'good':sc>=avg-3?'
 function colorFor(sc,avg){return{good:'var(--good)',ok:'#d7e3e6',warn:'var(--warn)',bad:'var(--bad)'}[cls(sc,avg)];}
 
 /* ================= Ansichten ================= */
-const SECTIONS=[['kader','Kaderanalyse',vKader],['transfer','Transfervorschläge',vTransfer],['taktik','Trainer & Taktik',vTaktik],['training','Training',vTraining],['spieler','Kaderliste',vSpieler]];
+const SECTIONS=[['kader','Kaderanalyse',vKader],['transfer','Transfervorschläge',vTransfer],['taktik','Taktik',vTaktik],['training','Training',vTraining],['spieler','Kaderliste',vSpieler]];
 function start(data,pick){
  DATA=data;TCFG=DATA.tactic||{};
  for(const k of Object.keys(FORMATIONS))delete FORMATIONS[k];Object.assign(FORMATIONS,BUILTIN_FORMATIONS);
@@ -499,16 +499,22 @@ function openPlayer(id,slotIdx){const own=DATA.squad.find(x=>x.id===id),p=own||D
  document.body.classList.add('dr');}
 function closeDrawer(){document.body.classList.remove('dr');}
 
-/* ---------- Trainer & Taktik ---------- */
+/* ---------- Taktik ---------- */
 const BAND={'Sehr schlecht':1,'Schlecht':2,'Durchschnitt':3,'Gut':4,'Sehr gut':5,'Herausragend':6,'Elite':6};
 const CA_ALIAS={Athletik:'Fitness',Fitness:'Athletik',Standards:'Standardsituationen',Standardsituationen:'Standards'};
 const cav=(ca,k)=>ca[k]??ca[CA_ALIAS[k]];
-function instrCard(an){const L=instrList();if(!L.length)return'';
- return`<div class="card"><h2>Teamanweisungen – passt der Kader?</h2><table class="tbl"><thead><tr><th>Anweisung</th><th>Einstellung</th><th class="num">Ø Startelf</th><th>Bewertung</th></tr></thead><tbody>
- ${L.map(([ph,k,v])=>{const x=INSTR[k+':'+v];if(!x)return`<tr><td class="psub">${esc(ph)} · ${esc(k)}</td><td>${esc(v)}</td><td></td><td class="dim">neutral</td></tr>`;
-  const avg=teamAttr(an,x.need).reduce((s,y)=>s+y[1],0)/x.need.length;const c=avg>=13?'good':avg>=11?'':avg>=9.5?'warn':'bad';
-  return`<tr><td><b>${esc(k)}</b><div class="psub">${esc(ph)}</div></td><td>${esc(v)}</td><td class="num"><b class="${c}">${avg.toFixed(1)}</b></td><td class="psub">${esc(x.t)} (${x.need.map(a=>AN[a]).join(', ')})${avg<11?' – <span class="warn">eher zurücknehmen</span>':avg>=13?' – <span class="good">passt</span>':''}</td></tr>`;}).join('')}</tbody></table>
- <p class="note">Bewertet wird der Durchschnitt der Startelf in den Attributen, die die Anweisung braucht (1–20).</p></div>`;}
+function lineup(an){return an.sl.map((s,i)=>({i,pos:s.pos,ip:s.ip,oop:s.oop,player:(an.assign[i]&&an.assign[i].p)||null}));}
+function areas(an){return TAKTIK.areaRatings(lineup(an),ROLES);}
+function applyRole(i,ph,id){setRole(i,ph==='ip'?0:1,id);WCACHE.clear();}
+function seeTransfers(i){S.f.pos=String(i);save();showSection('transfer');}
+function areaCard(an){const A=areas(an);
+ const pill=b=>b==='gut'?'<span class="pill g">gut</span>':b==='mittel'?'<span class="pill">mittel</span>':b==='schwach'?'<span class="pill b">schwach</span>':'<span class="pill">nicht bewertbar</span>';
+ const help=(a,c)=>{const sl=an.sl[c.i],pl=an.assign[c.i]&&an.assign[c.i].p;if(!pl)return'';
+  return`<ul class="tips">${TAKTIK.helpFor(a,c,pl,sl,ROLES,AN).map(h=>`<li>${esc(h.text)}${h.kind==='rolle'?` <button class="btn" onclick="applyRole(${c.i},'${a.phase}','${h.role}')">Übernehmen</button>`:h.kind==='transfer'?` <button class="btn" onclick="seeTransfers(${c.i})">Ansehen</button>`:''}</li>`).join('')}</ul>`;};
+ return`<div class="card"><h2>Taktische Bereiche</h2><table class="tbl"><tbody>
+ ${A.map(a=>`<tr><td><b>${esc(a.name)}</b><div class="psub">${a.phase==='ip'?'mit Ball':'gegen den Ball'}</div></td><td class="num"><b>${a.avg===null?'–':a.avg.toFixed(1)}</b></td><td>${pill(a.band)}</td></tr>
+ ${a.band==='schwach'?`<tr><td colspan="3">${a.causers.map(c=>`<div style="margin-bottom:10px"><a onclick="openPlayer(${c.id})"><b>${esc(c.n)}</b></a> <span class="psub">${esc(PDE[c.pos]||c.pos)} · ${esc(c.role)}${c.weak.length?' · schwach: '+c.weak.map(([k,v])=>esc(AN[k]||k)+' '+v).join(', '):''}</span>${help(a,c)}</div>`).join('')}</td></tr>`:''}`).join('')}</tbody></table>
+ <p class="note">Einschätzung aus den Attributen deiner Startelf in den Rollen der Taktik (1–20; Schlüsselattribute der Rolle zählen doppelt). Gut ab 13, mittel ab 11.</p></div>`;}
 function vTaktik(){const c=DATA.coach||{},an=analyze();const st=STYLES[S.style];
  const fam=c.style?(STYLE_OF_COACH[c.style]||'possession'):null;const match=st.family===fam;
  // Spielstil-Eignung des Kaders
@@ -518,15 +524,14 @@ function vTaktik(){const c=DATA.coach||{},an=analyze();const st=STYLES[S.style];
  const tacticNeeds={possession:['Ballbesitz','Techniken','Taktik','Fitness'],pressing:['Fitness','Defensive','Taktik'],counter:['Offensive','Fitness','Defensive'],wide:['Offensive','Techniken','Fitness'],direct:['Fitness','Standardsituationen','Offensive']}[st.family]||[];
  const gap=tacticNeeds.filter(x=>BAND[cav(ca,x)]<=2);const good=tacticNeeds.filter(x=>BAND[cav(ca,x)]>=5);
  const tend=c.tendencies||[];const defTend=tend.some(t=>/Defensiv/i.test(t)),offTend=tend.some(t=>/offensiv/i.test(t));
- let fit=50+(fam?(match?20:-10):0)-gap.length*8+good.length*5+(offTend&&st.family!=='counter'?4:0)-(defTend&&TCFG.instructions_oop&&/Hohes/.test(TCFG.instructions_oop.Pressinglinie||'')?4:0);fit=Math.max(5,Math.min(95,fit));
- const sq=ranking.find(r=>r.k===S.style);
- return`<div class="grid2"><div class="stack"><div class="card"><h2>Deine Taktik</h2>
+ return`<div class="stack"><div class="card"><h2>Deine Taktik</h2>
   <div class="row"><label class="f">Formation<select onchange="S.formation=this.value;S.selSlot=null;save();render()">${Object.keys(FORMATIONS).map(k=>`<option ${k===S.formation?'selected':''}>${esc(k)}</option>`).join('')}</select></label>
   <label class="f">Spielstil<select onchange="S.style=this.value;WCACHE.clear();save();render()">${Object.entries(STYLES).map(([k,v])=>`<option value="${k}" ${k===S.style?'selected':''}>${esc(v.name)}</option>`).join('')}</select></label>
   <label class="f">Gewicht mit Ball: ${S.ipw} %<input type="range" min="0" max="100" step="10" value="${S.ipw}" onchange="S.ipw=+this.value;save();render()"></label></div>
-  <p class="note">${TCFG.source==='Spielstand'?`Aus dem Spielstand gelesen: „${esc(TCFG.name)}“ – Positionen und Rollen mit/gegen den Ball${TCFG.style_name?`, Spielstil „${esc(TCFG.style_name)}“`:''}${TCFG.unknown_roles?` (${TCFG.unknown_roles} Rolle(n) nicht erkannt, mit „?“ markiert – bitte unter Kader-Analyse prüfen)`:''}.${(TCFG.saved||[]).length>1?` Weitere gespeicherte Taktiken: ${TCFG.saved.filter(n=>n!==TCFG.name).map(esc).join(', ')}.`:''}`:TCFG.source==='Standard'?'Im Spielstand ist keine eigene Taktik gespeichert – es wird eine Standardformation (4-2-3-1) verwendet.':`Taktik aus <code>config.json</code>: „${esc(TCFG.name||'')}“ (im Spielstand ist keine eigene Taktik gespeichert).`} Die Rollen pro Position kannst du unter <a onclick="showSection('kader')">Kaderanalyse</a> per Klick auf die Position ändern.</p></div>
- <div class="card"><h2>Trainer ↔ Taktik</h2><div class="row"><div class="fit" style="--v:${fit};--c:${fit>=65?'var(--good)':fit>=45?'var(--warn)':'var(--bad)'};width:60px;height:60px;font-size:18px"><span style="width:50px;height:50px">${fit}</span></div>
-  <div><b>${esc(c.name||DATA.meta.manager||'Trainer')}</b><div class="psub">Taktischer Stil: ${esc(c.style||'–')} · Bevorzugtes System: ${esc(c.preferred_system||'–')}</div></div></div>
+  <p class="note">${TCFG.source==='Spielstand'?`Aus dem Spielstand gelesen: „${esc(TCFG.name)}“ – Positionen und Rollen mit/gegen den Ball${TCFG.style_name?`, Spielstil „${esc(TCFG.style_name)}“`:''}${TCFG.unknown_roles?` (${TCFG.unknown_roles} Rolle(n) nicht erkannt, mit „?“ markiert – bitte unter Kader-Analyse prüfen)`:''}.${(TCFG.saved||[]).length>1?` Weitere gespeicherte Taktiken: ${TCFG.saved.filter(n=>n!==TCFG.name).map(esc).join(', ')}.`:''}`:TCFG.source==='Standard'?'Im Spielstand ist keine eigene Taktik gespeichert – es wird eine Standardformation (4-2-3-1) verwendet.':`Taktik aus <code>config.json</code>: „${esc(TCFG.name||'')}“ (im Spielstand ist keine eigene Taktik gespeichert).`} Die Rollen pro Position kannst du unter <a onclick="showSection('kader')">Kaderanalyse</a> per Klick auf die Position ändern.</p>
+  <table class="tbl"><thead><tr><th>Position</th><th>Rolle mit Ball</th><th>Rolle gegen den Ball</th><th>Spieler</th></tr></thead><tbody>${lineup(an).map(x=>`<tr><td>${PDE[x.pos]||x.pos}</td><td>${esc((ROLES[x.ip]||{}).name||'?')}</td><td>${esc((ROLES[x.oop]||{}).name||'?')}</td><td>${x.player?esc(x.player.n):'–'}</td></tr>`).join('')}</tbody></table></div>
+ ${areaCard(an)}
+ <div class="card"><h2>Trainer</h2><div><b>${esc(c.name||DATA.meta.manager||'Trainer')}</b><div class="psub">Taktischer Stil: ${esc(c.style||'–')} · Bevorzugtes System: ${esc(c.preferred_system||'–')}</div></div>
   <ul class="tips">
    ${!fam?'':'<li>'+(match?`<span class="good">Passt:</span> „${esc(st.name)}“ entspricht dem bevorzugten Stil „${esc(c.style)}“ deines Trainers.`:`<span class="warn">Abweichung:</span> „${esc(st.name)}“ gehört nicht zum Stil „${esc(c.style)}“. Ein ballbesitzorientierter Ansatz würde besser zum Trainerprofil passen.`)+'</li>'}
    ${gap.length?`<li><span class="warn">Coaching-Lücken für diese Taktik:</span> ${gap.join(', ')} (${gap.map(x=>esc(cav(ca,x))).join(', ')}). Stelle Co-/Fachtrainer mit Stärken in genau diesen Bereichen ein und lass sie die passenden Trainingseinheiten leiten.</li>`:'<li><span class="good">Keine großen Coaching-Lücken</span> für diesen Spielstil.</li>'}
@@ -539,8 +544,8 @@ function vTaktik(){const c=DATA.coach||{},an=analyze();const st=STYLES[S.style];
    ${(c.tendencies||[]).length?`<li>Tendenzen: ${(c.tendencies||[]).map(esc).join(' · ')}</li>`:''}
    ${c.mental&&BAND[c.mental['Motivationsfähigkeit']]<=2?'<li>Motivationsfähigkeit schwach → Teamansprachen eher ruhig/ermutigend halten, einen Co-Trainer mit guter Motivation einstellen.</li>':''}
    ${c.mental&&BAND[c.mental['Autorität']]>=4&&BAND[c.mental['Autorität']]<6?'<li>Gute Autorität → strenge Disziplin und klare Vorgaben werden von der Mannschaft akzeptiert.</li>':''}
-  </ul><p class="note">${c.source==='Spielstand'?'Die Trainerbewertungen sind aus dem Spielstand gelesen.':Object.keys(ca).length?'Trainerwerte stammen aus <code>config.json</code>.':'Im Spielstand wurden keine Trainerbewertungen gefunden.'}</p></div></div>
- <div class="stack"><div class="card"><h2>Taktik-Empfehlung</h2>
+  </ul><p class="note">${c.source==='Spielstand'?'Die Trainerbewertungen sind aus dem Spielstand gelesen.':Object.keys(ca).length?'Trainerwerte stammen aus <code>config.json</code>.':'Im Spielstand wurden keine Trainerbewertungen gefunden.'}</p></div>
+ <div class="card"><h2>Diese Spielstile passen besser zu deinem Kader</h2>
   <p>Welcher Spielstil passt zu den <b>Attributen deiner Startelf</b> – und zum <b>Trainer</b>?</p>
   <table class="tbl"><thead><tr><th>Spielstil</th><th class="num">Ø passende Attribute</th><th>Trainer</th></tr></thead><tbody>
   ${ranking.map(r=>`<tr style="${r.k===S.style?'background:var(--panel2)':''}"><td><b>${esc(r.v.name)}</b>${r.k===S.style?' <span class="pill a">aktuell</span>':''}<div class="psub">${esc(r.v.desc)}</div></td><td class="num"><b class="${r.avg>=12.5?'good':r.avg>=11?'':'warn'}">${r.avg.toFixed(1)}</b></td><td>${r.coach?'<span class="pill g">passt</span>':fam?'<span class="pill">neutral</span>':'<span class="dim">–</span>'}</td></tr>`).join('')}</tbody></table>
@@ -548,7 +553,7 @@ function vTaktik(){const c=DATA.coach||{},an=analyze();const st=STYLES[S.style];
    <li><b>Empfehlung:</b> „${esc(coachBest.v.name)}“ – ${fam?'verbindet den Stil des Trainers mit dem, was dein Kader am besten kann':'passt am besten zu den Attributen deiner Startelf'}${coachBest.k===S.style?' (das ist bereits deine Taktik)':''}.</li>
    ${top.k!==coachBest.k?`<li>Rein nach Kader wäre „${esc(top.v.name)}“ am stärksten (Ø ${top.avg.toFixed(1)}). Kompromiss: Ballbesitz beibehalten, aber Elemente davon übernehmen – z. B. ${top.v.family==='pressing'?'höheres Pressing und Gegenpressing nach Ballverlust':top.v.family==='counter'?'bei Ballgewinn schneller kontern, tiefer verteidigen':top.v.family==='wide'?'mehr Breite und Flanken über die Außen':'direktere Pässe auf die Spitze'}.</li>`:''}
    ${(()=>{const ta=teamAttr(an,st.needs).sort((a,b)=>a[1]-b[1]).slice(0,3);return`<li>Größte Lücken für „${esc(st.name)}“: ${ta.map(([k,v])=>AN[k]+' ('+v.toFixed(1)+')').join(', ')} → Teamanweisungen entschärfen (${st.family==='possession'?'etwas kürzere Pässe, niedrigeres Tempo bei schwacher Technik':'Intensität dosieren'}) und gezielt trainieren/verpflichten.</li>`;})()}
-  </ul></div>${instrCard(an)}</div></div>`;}
+  </ul></div></div>`;}
 
 /* ---------- Training (echte FM27-Einheiten) ---------- */
 const CAT={tv:['Taktisches Verständnis','c-tak'],sv:['Spielvorbereitung','c-match'],fe:['Fußballerische Entwicklung','c-tec'],pr:['Physis und Regeneration','c-phy'],so:['Sonstiges','c-set'],x:['','c-match']};
@@ -612,8 +617,8 @@ function vSpieler(){const an=analyze();const pos=p=>PK.map((k,i)=>[k,p.pos[i]]).
 const DEV=new URLSearchParams(location.search).has('dev');
 let API=null,BOOTED=false;
 const W={view:'boot',state:null,sel:null,sum:null,list:false,pick:'alles',keep:false,busy:false,prog:[0,6,''],error:'',dirVal:'',dirMsg:'',dirOk:false,gameMsg:'',info:'aus'};
-const PICKS=[['alles','Alles','Kader, Transfers, Trainer & Taktik, Training, Kaderliste'],['kader','Nur Kaderanalyse','Beste Elf, Schwachstellen'],
- ['transfer','Nur Transfervorschläge','mit Wechselchance'],['taktik','Nur Trainer & Taktik','Passung Trainer ↔ Taktik, Spielstile'],
+const PICKS=[['alles','Alles','Kader, Transfers, Taktik, Training, Kaderliste'],['kader','Nur Kaderanalyse','Beste Elf, Schwachstellen'],
+ ['transfer','Nur Transfervorschläge','mit Wechselchance'],['taktik','Nur Taktik','Schwachstellen, Trainer, Spielstile'],
  ['training','Nur Trainingsvorschlag','Wochenplan zur Taktik'],['spieler','Nur Kaderliste','alle Spieler mit Attributen']];
 const dDate=d=>new Date(d).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
 const dTime=d=>new Date(d).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
