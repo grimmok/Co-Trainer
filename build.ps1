@@ -11,10 +11,10 @@ if (-not (Test-Path $python)) { throw 'Die Umgebung .venv fehlt: python -m uv ve
 if ($MitSpielstand) { & $python -m pytest tests -q } else { & $python -m pytest tests -q -m 'not save' }
 if ($LASTEXITCODE -ne 0) { throw 'Tests fehlgeschlagen - es wird nichts gebaut.' }
 
-# Nur index.html wird eingepackt; dev-data.json und config.json bleiben draußen.
+# Nur index.html und taktik.js werden eingepackt; dev-data.json und config.json bleiben draußen.
 & $python -m PyInstaller --noconfirm --clean --onefile --windowed --name Co-Trainer `
     --collect-submodules fmsave --copy-metadata fmsave --collect-all backports.zstd `
-    --add-data 'cotrainer/ui/index.html;cotrainer/ui' cotrainer/__main__.py
+    --add-data 'cotrainer/ui/index.html;cotrainer/ui' --add-data 'cotrainer/ui/taktik.js;cotrainer/ui' cotrainer/__main__.py
 if ($LASTEXITCODE -ne 0) { throw 'PyInstaller ist fehlgeschlagen.' }
 
 $exe = Get-Item (Join-Path $PSScriptRoot 'dist\Co-Trainer.exe')
