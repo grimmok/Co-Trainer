@@ -796,6 +796,7 @@ VIS_POOL, QUALITY_POOL = 3000, 4000
 
 REP_PER_POINT = 50          # Reputationsabstand → Skala des früheren Stärkeabstands (Serie A ↔ Serie C ≈ 56)
 FREE_AGENT_DIFF = -10       # Vereinslose wollen eher wechseln
+REP_DIFF_MIN = -10          # viel kleinere Vereine zählen nicht stärker als Vereinslose
 
 
 def club_rep_diff(club, my_id, club_map):
@@ -827,13 +828,14 @@ def willingness_score(diff, free, pers, years_left, age):
     return max(2, min(97, round(score)))
 
 
-def select_pool(area, will, con, quality_ok, quality_key, vis_n=VIS_POOL, quality_n=QUALITY_POOL):
-    """Pool aus zwei Auswahlen → [(Spieler, vis)]. Zuerst „vis“: die ersten vis_n nach Wechselchance absteigend,
-    dann Vertragsende aufsteigend (vertragslos zuerst) – ohne CA/PA/Attribute. Danach die Qualitätsauswahl
+def select_pool(area, will, con, rep, quality_ok, quality_key, vis_n=VIS_POOL, quality_n=QUALITY_POOL):
+    """Pool aus zwei Auswahlen → [(Spieler, vis)]. Zuerst „vis“, nur nach sichtbaren Merkmalen (kein CA/PA, keine
+    Attribute): Wechselchance in Zehnerstufen absteigend, Vereinsreputation (rep: Vereins-ID → Reputation) absteigend,
+    Vereinslose zuerst, Vertragsende aufsteigend (ohne Ende zuerst); die ersten vis_n. Danach die Qualitätsauswahl
     (quality_ok, sortiert nach quality_key, die ersten quality_n) ohne Doppelte."""
     def vis_key(pl):
         end = con.get(pl['id'], {}).get('end')
-        return (-will[pl['id']], end is not None, end or '')
+        return (-(will[pl['id']] // 10), -(rep.get(pl['club']) or 0), pl['club'] != 0, end is not None, end or '')
     vis_sel = sorted(area, key=vis_key)[:vis_n]
     vis_ids = {pl['id'] for pl in vis_sel}
     qual = sorted((pl for pl in area if quality_ok(pl)), key=quality_key)[:quality_n]
@@ -1032,7 +1034,7 @@ def _analyse(save, frames, names, cfg, progress):
             return None
         free = pl['club'] == 0
         if fd is not None:
-            diff = club_rep_diff(pl['club'], my_id, club_map)
+            diff = max(club_rep_diff(pl['club'], my_id, club_map), REP_DIFF_MIN)   # kleine Vereine: gedeckelt
         else:                                       # eigener Leser: keine Reputation, Vereinsstärke wie bisher
             diff = club_str.get(pl['club'], 50 if free else my_str + 5) - my_str
         return willingness_score(diff, free, pl['pers'], years_left(pl['id']), age_of(pl['dob']))
@@ -1080,7 +1082,8 @@ def _analyse(save, frames, names, cfg, progress):
 
     def quality_key(pl):
         return -(will[pl['id']] * (pl['ca'] - lo + 10))
-    chosen = select_pool(area, will, con, quality_ok, quality_key)
+    club_rep = {cid: c.get('rep') for cid, c in club_map.items()} if fd is not None else {}
+    chosen = select_pool(area, will, con, club_rep, quality_ok, quality_key)
     pool = []
     for pl, vis in chosen:
         r = out_player(pl, False, will[pl['id']])

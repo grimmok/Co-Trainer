@@ -115,3 +115,34 @@ def test_read_passes_strict_setting_and_ignores_only_unknown_build(monkeypatch):
     def fake_open(path, **kw): seen.update(kw); return Save()
     monkeypatch.setattr(fms.fmsave, 'open', fake_open)
     assert fms.read('x.fm', {}, 'X') is None and seen == {'strict': fms.STRICT}
+
+
+def test_club_uid_zero_is_a_real_club_not_vereinslos():
+    z = fms.FMS_CLUB_ZERO
+    assert z == 2 ** 31
+    assert fms.player_record(player(club_uid=0))['club'] == z
+    assert fms.player_record(player(club_uid=None))['club'] == 0
+    assert fms.player_record(player(loan_parent_club_uid=0))['loan_parent'] == z
+    assert fms.player_record(player())['loan_parent'] is None
+    fx = [NS(competition_id=5, home_club_uid=a, away_club_uid=b, home_team_slot=0, away_team_slot=0)
+          for a, b in [(0, 2), (3, 4), (5, 6), (0, 3)]]
+    c = fms.comps_from_fixtures(fx, {5: 1}, {1: ('L', 'L')})
+    assert c[5]['teams'] == [2, 3, 4, 5, 6, z]
+    assert fms.pick_own_club([NS(club_uid=0, club_name='KS Besa', club_short_name='Besa')], 'Besa') == z
+
+
+def test_read_maps_club_uid_zero(monkeypatch):
+    class Save:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def managed_clubs(self): return [NS(club_uid=11, club_name='Ravenna', club_short_name='Ravenna')]
+        def nations(self): return []
+        def players(self): return [player(uid=1, club_uid=0), player(uid=2, club_uid=None)]
+        def clubs(self): return [NS(uid=0, name='KS Besa', short_name='Besa', nation_id=None, reputation=10),
+                                 NS(uid=11, name='Ravenna', short_name='Ravenna', nation_id=None, reputation=4600)]
+        def competitions(self): return []
+        def fixtures(self): return []
+    monkeypatch.setattr(fms.fmsave, 'open', lambda path, **kw: Save())
+    d = fms.read('x.fm', {}, 'Ravenna')
+    assert set(d.clubs) == {fms.FMS_CLUB_ZERO, 11} and 0 not in d.clubs
+    assert d.players[1]['club'] == fms.FMS_CLUB_ZERO and d.players[2]['club'] == 0 and d.own_club == 11

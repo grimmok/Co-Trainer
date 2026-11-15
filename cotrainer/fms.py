@@ -34,6 +34,15 @@ class FmsData:
     own_club: int = 0
 
 
+# fmsave führt einen echten Verein unter der uid 0 (Ravenna: KS Besa Kavajë); bei uns heißt club == 0 „vereinslos“.
+FMS_CLUB_ZERO = 2 ** 31
+
+
+def _club_id(uid):
+    """fmsave-Vereins-uid → unsere Vereins-ID: None bleibt None, 0 wird FMS_CLUB_ZERO."""
+    return FMS_CLUB_ZERO if uid == 0 else uid
+
+
 def _val(obj, name, default):
     v = getattr(obj, name, None) if obj is not None else None
     return default if v is None else v
@@ -66,9 +75,10 @@ def player_record(p, nat_db=None):
             pers = None
     nid = getattr(p, 'nation_id', None)
     nat = nat_db.get(nid) if nat_db and nid is not None else None
-    return dict(id=p.uid, name=(p.name or '').strip() or f'#{p.uid}', dob=p.birth_date, club=p.club_uid or 0,
+    club = 0 if p.club_uid is None else _club_id(p.club_uid)       # None = vereinslos
+    return dict(id=p.uid, name=(p.name or '').strip() or f'#{p.uid}', dob=p.birth_date, club=club,
                 first=(getattr(p, 'first_name', None) or '').strip(), last=(getattr(p, 'last_name', None) or '').strip(),
-                loan_parent=getattr(p, 'loan_parent_club_uid', None),
+                loan_parent=_club_id(getattr(p, 'loan_parent_club_uid', None)),
                 ca=ca, pa=pa, pos=[_val(p.positions, f, 1) for f in _POS_FIELDS], attrs=attrs, pers=pers,
                 team_slot=p.team_slot, nat=nat)
 
@@ -84,7 +94,7 @@ def comps_from_fixtures(fixtures, comp_db, cnames):
         # diesen sonst in die falsche Liga ziehen
         if f.home_team_slot == 0 and f.away_team_slot == 0 and f.home_club_uid is not None \
                 and f.away_club_uid is not None:
-            teams.setdefault(f.competition_id, set()).update((f.home_club_uid, f.away_club_uid))
+            teams.setdefault(f.competition_id, set()).update((_club_id(f.home_club_uid), _club_id(f.away_club_uid)))
     comps = {}
     for cid, ts in teams.items():
         long_, short = cnames.get(comp_db.get(cid), (f'Wettbewerb {cid}',) * 2)
@@ -104,7 +114,7 @@ def pick_own_club(managed, club_name):
     """Eigener Verein nach dem Namen aus der Spielstand-Übersicht; ohne Treffer None (Rückfall auf den eigenen Leser)."""
     for m in managed:
         if club_name in (m.club_name, m.club_short_name):
-            return m.club_uid
+            return _club_id(m.club_uid)
     return None
 
 
@@ -127,7 +137,7 @@ def read(path, cnames, club_name):
                     players[p.uid] = r
                     if p.contract is not None:
                         contracts[p.uid] = contract_record(p.contract)
-                clubs = {c.uid: club_record(c, nat_db) for c in s.clubs()}
+                clubs = {_club_id(c.uid): club_record(c, nat_db) for c in s.clubs()}
                 comp_db = {c.id: c.database_id for c in s.competitions()}
                 comps = comps_from_fixtures(s.fixtures(), comp_db, cnames)
         for w in caught:                       # der unbekannte Build gehört bei FM27 dazu; alles andere melden

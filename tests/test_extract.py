@@ -276,12 +276,13 @@ def test_willingness_uses_club_reputation():
 def test_vis_selection_ignores_ca_and_pa():
     import random
     rnd = random.Random(7)
-    area = [dict(id=i, ca=rnd.randint(40, 160), pa=rnd.randint(60, 190)) for i in range(400)]
+    area = [dict(id=i, club=i % 30, ca=rnd.randint(40, 160), pa=rnd.randint(60, 190)) for i in range(400)]
     will = {pl['id']: rnd.randint(2, 97) for pl in area}
     con = {pl['id']: dict(end=None if pl['id'] % 9 == 0 else f'202{pl["id"] % 5 + 6}-06-30') for pl in area}
+    rep = {c: rnd.randint(0, 5000) for c in range(1, 30)}
 
     def run():
-        out = X.select_pool(area, will, con, lambda pl: 80 <= pl['ca'] <= 130, lambda pl: -pl['ca'],
+        out = X.select_pool(area, will, con, rep, lambda pl: 80 <= pl['ca'] <= 130, lambda pl: -pl['ca'],
                             vis_n=100, quality_n=80)
         return [pl['id'] for pl, v in out if v], [pl['id'] for pl, v in out if not v]
     vis1, qual1 = run()
@@ -292,8 +293,19 @@ def test_vis_selection_ignores_ca_and_pa():
     vis2, qual2 = run()
     assert len(vis1) == 100 and vis1 == vis2                      # Auswahl und Reihenfolge gleich
     assert qual1 != qual2 and not set(vis1) & set(qual1)          # Qualitätsteil darf sich ändern, keine Doppelten
-    w = [will[i] for i in vis1]
-    assert w == sorted(w, reverse=True)
+    bands = [will[i] // 10 for i in vis1]
+    assert bands == sorted(bands, reverse=True)
+
+
+def test_vis_order_within_band_by_club_reputation():
+    area = [dict(id=1, club=5), dict(id=2, club=6), dict(id=3, club=0), dict(id=4, club=6), dict(id=5, club=7)]
+    will = {1: 91, 2: 95, 3: 97, 4: 95, 5: 80}
+    con = {1: dict(end='2027-06-30'), 2: dict(end='2028-06-30'), 4: dict(end='2026-12-31'), 5: dict(end=None)}
+    rep = {5: 3000, 6: 4500, 7: 9000}
+    out = X.select_pool(area, will, con, rep, lambda pl: False, lambda pl: 0)
+    # Stufe 90er: Verein 6 (4500) vor Verein 5 (3000) vor vereinslos (keine Reputation); bei gleichem Verein
+    # entscheidet das Vertragsende; Stufe 80er (trotz Reputation 9000) zuletzt
+    assert [pl['id'] for pl, v in out] == [4, 2, 1, 3, 5] and all(v for _, v in out)
 
 
 @pytest.mark.save
