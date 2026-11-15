@@ -258,6 +258,7 @@ function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
 /* ================= Berechnung ================= */
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const nf=new Intl.NumberFormat('de-DE');
+function yr(w){return w==null?null:w*52;}  // Gehälter liegen pro Woche vor, angezeigt wird pro Jahr wie im Spiel
 function money(v){if(v==null)return'–';const a=Math.abs(v);return a>=1e6?(v/1e6).toLocaleString('de-DE',{maximumFractionDigits:2})+' Mio. €':a>=1e3?Math.round(v/1e3)+'K €':nf.format(v)+' €';}
 const posRating=(p,pos)=>p.pos[PK.indexOf(pos)]||1;
 
@@ -342,8 +343,8 @@ function vKader(){const an=analyze(),ns=needs(an),f=DATA.meta.finances||{};
  const wagesum=DATA.squad.reduce((s,p)=>s+(p.wage||0),0);
  const st=STYLES[S.style];const ta=teamAttr(an,st.needs).sort((a,b)=>a[1]-b[1]);
  return`<div class="kpi"><div><small>Team-Fit (Startelf)</small><b>${Math.round(an.avg)}</b> <span class="muted">/ 100</span></div>
- <div><small>Transferbudget</small><b>${money(f.transfer_budget)}</b></div><div><small>Gehaltsbudget / Woche</small><b>${money(f.wage_budget_week)}</b></div>
- <div><small>Spielergehälter erfasst / Woche</small><b class="${wagesum>(f.wage_budget_week||1e12)?'bad':''}">${money(wagesum)}</b></div><div><small>Kontostand</small><b>${money(f.balance)}</b></div></div>
+ <div><small>Transferbudget</small><b>${money(f.transfer_budget)}</b></div><div><small>Gehaltsbudget / Jahr</small><b>${money(yr(f.wage_budget_week))}</b></div>
+ <div><small>Spielergehälter erfasst / Jahr</small><b class="${wagesum>(f.wage_budget_week||1e12)?'bad':''}">${money(yr(wagesum))}</b></div><div><small>Kontostand</small><b>${money(f.balance)}</b></div></div>
  <div class="grid-an"><div class="stack"><div class="card"><h3>${esc(S.formation)} · ${esc(st.name)}</h3>${pitch(an,true)}
  <p class="note">Zahl = Eignung (0–100) für Position + Rolle (mit/gegen den Ball) im gewählten Spielstil. Grün = über, Orange/Rot = unter dem Teamschnitt. Klick auf eine Position zeigt Alternativen.</p></div></div>
  <div class="stack">${S.selSlot!=null?slotDetail(an,S.selSlot):''}
@@ -383,13 +384,13 @@ function renderSug(){const el=document.getElementById('sug');if(!el)return;const
  const sorters={gain:(a,b)=>b.gain-a.gain,will:(a,b)=>b.p.will-a.p.will||b.gain-a.gain,value:(a,b)=>a.p.val-b.p.val,young:(a,b)=>a.p.age-b.p.age||b.gain-a.gain};
  rows.sort(sorters[S.f.sort]||sorters.gain);const top=rows.slice(0,80);
  if(!top.length){el.innerHTML='<div class="muted" style="padding:30px;text-align:center">Keine passenden Kandidaten – Filter lockern (Alter, Wechselchance, Budget).</div>';return;}
- el.innerHTML=`<div class="tblw"><table class="tbl"><thead><tr><th>Fit</th><th>Spieler</th><th>Position</th><th class="num">+ zur Startelf</th><th>Entwicklung</th><th class="num">Wechselchance</th><th class="num">Preis (geschätzt)</th><th class="num">Gehalt/Woche</th><th>Vertrag</th></tr></thead><tbody>
+ el.innerHTML=`<div class="tblw"><table class="tbl"><thead><tr><th>Fit</th><th>Spieler</th><th>Position</th><th class="num">+ zur Startelf</th><th>Entwicklung</th><th class="num">Wechselchance</th><th class="num">Preis (geschätzt)</th><th class="num">Gehalt/Jahr</th><th>Vertrag</th></tr></thead><tbody>
  ${top.map(x=>{const p=x.p,s=sl[x.i],w=p.will,wc=w>=60?'good':w>=35?'':w>=20?'warn':'bad';
   return`<tr class="click" onclick="openPlayer(${p.id},${x.i})"><td><div class="fit" style="--v:${Math.round(x.sc)};--c:var(--acc)"><span>${Math.round(x.sc)}</span></div></td>
   <td><div class="pname">${esc(p.n)}</div><div class="psub">${p.age} J. · ${esc(p.club||'vereinslos')}${p.lg?' · '+esc(p.lg):''}</div></td>
   <td>${PDE[s.pos]}<div class="psub">${esc(ROLES[s.ip].name)}</div></td><td class="num good"><b>+${Math.round(x.gain)}</b></td>
   <td class="psub" style="max-width:240px">${esc(p.pot)}</td><td class="num"><b class="${wc}">${w} %</b></td>
-  <td class="num">${money(p.val)}${p.val>bud?'<div><span class="pill b">über Budget</span></div>':''}</td><td class="num">${money(p.wage)}${p.wage>(f.wage_budget_week||0)*0.08?'<div><span class="pill w">teuer</span></div>':''}</td>
+  <td class="num">${money(p.val)}${p.val>bud?'<div><span class="pill b">über Budget</span></div>':''}</td><td class="num">${money(yr(p.wage))}${p.wage>(f.wage_budget_week||0)*0.08?'<div><span class="pill w">teuer</span></div>':''}</td>
   <td class="psub">${p.end?new Date(p.end).toLocaleDateString('de-DE'):'–'}</td></tr>`;}).join('')}</tbody></table></div>
   <p class="note">${rows.length} Spieler würden die Startelf verbessern, angezeigt werden die ersten 80. Dein Gehaltsbudget ist zu ${Math.round(DATA.squad.reduce((s,p)=>s+(p.wage||0),0)/Math.max(1,f.wage_budget_week||1)*100)} % ausgeschöpft – für Neuzugänge ggf. Gehalt umschichten oder Spieler abgeben.</p>`;}
 
@@ -402,7 +403,7 @@ function openPlayer(id,slotIdx){const p=DATA.squad.find(x=>x.id===id)||DATA.pool
  document.getElementById('drawer').innerHTML=`<div class="row" style="justify-content:space-between"><h2 style="margin:0">${esc(p.n)}</h2><button class="btn" onclick="closeDrawer()">Schließen</button></div>
  <p class="muted">${p.age} Jahre · ${esc(p.club||DATA.meta.club_short)}${p.lg?' · '+esc(p.lg):''} · Positionen: ${best||'–'}</p>
  <div class="card" style="margin-bottom:14px"><b>Entwicklung:</b> ${esc(p.pot)}${p.will!=null?`<br><b>Wechselchance:</b> ${p.will} % <span class="muted">(${esc(p.rel)} als dein Kaderdurchschnitt)</span>`:''}
- <br><b>Vertrag:</b> ${p.end?'bis '+new Date(p.end).toLocaleDateString('de-DE'):'–'} · <b>Gehalt:</b> ${money(p.wage)}/Woche · <b>Wert (geschätzt):</b> ${money(p.val)}
+ <br><b>Vertrag:</b> ${p.end?'bis '+new Date(p.end).toLocaleDateString('de-DE'):'–'} · <b>Gehalt:</b> ${money(yr(p.wage))}/Jahr · <b>Wert (geschätzt):</b> ${money(p.val)}
  ${p.tr?`<br><b>Trainingsbewertung:</b> ${p.tr[1]?p.tr[1].toFixed(2):'–'} <span class="muted">(vorher ${p.tr[0]?p.tr[0].toFixed(2):'–'})</span>`:''}</div>
  <div class="attrs">${groups.map(([g,ks])=>`<div><h3>${g}</h3>${ks.map(k=>`<div class="a ${keys.has(k)?'k':''}"><span>${AN[k]}</span><span class="${vc(p.a[k])}">${p.a[k]??'–'}</span></div>`).join('')}</div>`).join('')}</div>
  <p class="note">Fett = Schlüsselattribute der gewählten Rolle. Starker Fuß: ${p.a.LFoot>=p.a.RFoot?'links':'rechts'} (schwacher Fuß ${Math.min(p.a.LFoot,p.a.RFoot)}/20).</p>`;
@@ -514,8 +515,8 @@ function vTraining(){const an=analyze(),st=STYLES[S.style];
 function vSpieler(){const an=analyze();const pos=p=>PK.map((k,i)=>[k,p.pos[i]]).filter(x=>x[1]>=15).sort((a,b)=>b[1]-a[1]).map(x=>PDE[x[0]]).join(', ');
  const start=new Set(an.assign.filter(Boolean).map(x=>x.p.id));
  const list=[...DATA.squad].sort((a,b)=>(start.has(b.id)-start.has(a.id))||b.age-a.age);
- return`<div class="card"><h2>Kader (${list.length} Spieler)</h2><div class="tblw"><table class="tbl"><thead><tr><th>Spieler</th><th>Alter</th><th>Positionen</th><th>Entwicklung</th><th class="num">Gehalt/Woche</th><th>Vertrag bis</th><th class="num">Training</th></tr></thead><tbody>
- ${list.map(p=>`<tr class="click" onclick="openPlayer(${p.id})"><td class="pname">${esc(p.n)} ${start.has(p.id)?'<span class="pill a">Startelf</span>':''}</td><td>${p.age}</td><td>${pos(p)}</td><td class="psub">${esc(p.pot)}</td><td class="num">${money(p.wage)}</td><td class="psub">${p.end?new Date(p.end).toLocaleDateString('de-DE'):'–'}</td><td class="num">${p.tr&&p.tr[1]?p.tr[1].toFixed(2):'–'}</td></tr>`).join('')}</tbody></table></div>
+ return`<div class="card"><h2>Kader (${list.length} Spieler)</h2><div class="tblw"><table class="tbl"><thead><tr><th>Spieler</th><th>Alter</th><th>Positionen</th><th>Entwicklung</th><th class="num">Gehalt/Jahr</th><th>Vertrag bis</th><th class="num">Training</th></tr></thead><tbody>
+ ${list.map(p=>`<tr class="click" onclick="openPlayer(${p.id})"><td class="pname">${esc(p.n)} ${start.has(p.id)?'<span class="pill a">Startelf</span>':''}</td><td>${p.age}</td><td>${pos(p)}</td><td class="psub">${esc(p.pot)}</td><td class="num">${money(yr(p.wage))}</td><td class="psub">${p.end?new Date(p.end).toLocaleDateString('de-DE'):'–'}</td><td class="num">${p.tr&&p.tr[1]?p.tr[1].toFixed(2):'–'}</td></tr>`).join('')}</tbody></table></div>
  <p class="note">Fähigkeit und Potenzial werden bewusst nicht als Zahl angezeigt – nur als Entwicklungstext.</p></div>`;}
 
 /* ================= Programmablauf: geführter Start ================= */
