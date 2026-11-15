@@ -141,3 +141,15 @@ def test_failed_result_delivery_reports_error_instead_of_hanging(api, monkeypatc
     api._window.evaluate_js = flaky
     api.analyse("x.fm"); api.join()
     assert api._window.calls[-1] == 'CT.onError("Das Ergebnis konnte nicht angezeigt werden: RuntimeError")'
+
+
+def test_about_reports_version_license_and_fmsave(api):
+    import cotrainer
+    a = api.about()
+    assert a['version'] == cotrainer.__version__ and a['license'] == 'MIT'
+    assert 'fmsave 0.11.0 – MIT' in a['notices']
+
+
+def test_about_without_notices_file(api, monkeypatch, tmp_path):        # Review Focus 1
+    monkeypatch.setattr(api_mod.about, 'notices_path', lambda: str(tmp_path / 'fehlt.txt'))
+    assert api.about()['notices'] is None

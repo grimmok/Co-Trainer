@@ -9,7 +9,7 @@ import os
 import threading
 from dataclasses import asdict
 
-from . import __version__, extract, guard, saves, settings
+from . import __version__, about, extract, guard, saves, settings
 
 
 def _lang_db_in(game_dir):
@@ -82,6 +82,10 @@ class Api:
             return dict(ok=True, **saves.read_summary(path))
         except extract.SaveReadError as e:
             return dict(ok=False, error=str(e))
+
+    def about(self):
+        """Version, Lizenz und Lizenzhinweise der mitgelieferten Software (notices ist None, wenn die Datei fehlt)."""
+        return dict(version=__version__, license='MIT', notices=about.notices_text(about.notices_path()))
 
     def set_theme(self, theme):
         if theme not in settings.THEMES:
