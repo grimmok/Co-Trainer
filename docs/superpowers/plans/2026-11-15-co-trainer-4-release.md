@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Co-Trainer ist als `Co-Trainer.exe` mit README, vollständigen Lizenzhinweisen (Repo und Programm) und einem GitHub-Release v0.1.0 verteilbar.
+**Goal:** Co-Trainer ist als `Co-Trainer.exe` mit README, vollständigen Lizenzhinweisen (Repo und Programm) und einem GitHub-Release v1.0.0 verteilbar.
 
 **Architecture:** Ein Entwicklerskript `tools/third_party.py` sammelt die Lizenztexte aller Pakete, die in die `.exe` gebündelt werden, plus Python, in `THIRD_PARTY_LICENSES.txt` (eingecheckt, von `build.ps1` neu erzeugt und mitgepackt). `cotrainer/about.py` liest diese Datei im Programm; `Api.about()` gibt sie an die Oberfläche, die sie im Fenster „Über Co-Trainer“ zeigt. README und Release-Text erklären Start, Windows-Schutzhinweis und WebView2.
 
@@ -18,7 +18,7 @@
 - CA, PA und versteckte Werte erscheinen nirgends, auch nicht in README-Beispielen oder Screenshots.
 - Lizenz des Repos: MIT (`LICENSE`, Copyright „grimmok“). Lizenzhinweis für fmsave (MIT) im Programm und im Repo.
 - Die `.exe` ist nicht signiert; README und Release-Text erklären „Der Computer wurde durch Windows geschützt“ → „Weitere Informationen“ → „Trotzdem ausführen“.
-- Version `0.1.0` (`cotrainer/__init__.py`, `pyproject.toml`), Tag `v0.1.0`.
+- Version `1.0.0` (`cotrainer/__init__.py`, `pyproject.toml`), Tag `v1.0.0`.
 - Keine persönlichen Daten in neuen Dateien: kein echter Name, keine Pfade unter `C:\Users\<Name>`; Pfade als `%USERPROFILE%\…` bzw. „Dokumente\Sports Interactive\…“.
 - Das Repository bleibt privat. Claude schaltet die Sichtbarkeit nicht um (Entscheidung des Nutzers, 15.11.).
 - Commits als `grimmok` mit `317344714+grimmok@users.noreply.github.com` (lokal eingestellt).
@@ -26,7 +26,7 @@
 ## Review Focus
 
 1. **Lizenzdatei fehlt im gepackten Programm** (z. B. `build.ps1` ohne `--add-data`): „Über Co-Trainer“ öffnet trotzdem und sagt im Klartext, dass die Lizenzhinweise fehlen, statt abzustürzen. → Task 2, `test_about_without_notices_file`.
-2. **Paket ohne Lizenztext** (proxy_tools 0.1.0 liefert keinen): Das Skript bricht nicht ab, sondern nennt Lizenz laut Paketangaben und Projektadresse. → Task 1, `test_license_text_falls_back_to_metadata`.
+2. **Paket ohne Lizenztext** (proxy_tools 1.0.0 liefert keinen): Das Skript bricht nicht ab, sondern nennt Lizenz laut Paketangaben und Projektadresse. → Task 1, `test_license_text_falls_back_to_metadata`.
 3. **Veraltete Lizenzliste nach einem Paket-Update:** Die eingecheckte Datei nennt jede gebündelte Laufzeitabhängigkeit mit der installierten Version. → Task 1, `test_checked_in_notices_match_installed_versions`.
 4. **Klick auf eine Adresse im Fenster „Über“** würde die Oberfläche durch eine fremde Seite ersetzen: Das Fenster enthält keine `<a href="http…">`. → Task 2, `test_about_modal_has_no_external_links`.
 5. **Entwicklermodus (`?dev=1`)** hat kein Python: Die nachgestellte API braucht `about`, sonst wirft der Klick einen Fehler. → Task 2, `test_dev_api_has_about`.
@@ -109,7 +109,7 @@ def test_checked_in_notices_match_installed_versions():
   - `Api.about() -> dict(version=__version__, license='MIT', notices=str | None)`.
   - JS: `openAbout()` öffnet `#modal`, `closeModal()` (gibt es schon) schließt.
 - Texte im Fenster (fest):
-  - Überschrift „Über Co-Trainer“, Zeile „Version 0.1.0“ (aus `about().version`).
+  - Überschrift „Über Co-Trainer“, Zeile „Version 1.0.0“ (aus `about().version`).
   - „Co-Trainer ist freie Software unter der MIT-Lizenz. Es liest Football-Manager-Spielstände nur und verändert sie nie.“
   - „Die Spielstände werden mit der Bibliothek fmsave gelesen (MIT-Lizenz, github.com/rhiever/fmsave).“
   - „Co-Trainer ist ein Fanprojekt und steht in keiner Verbindung zu Sports Interactive oder SEGA. Football Manager ist eine Marke von Sports Interactive.“
@@ -152,7 +152,7 @@ def test_dev_api_has_about():
 
 **Files:**
 - Create: `README.md`
-- Modify: `pyproject.toml` (`readme = "README.md"`, `license = "MIT"`)
+- Modify: `pyproject.toml` (`readme = "README.md"`, `license = "MIT"`, `version = "1.0.0"`), `cotrainer/__init__.py` (`__version__ = "1.0.0"`, Wunsch des Nutzers 15.11.)
 
 **Interfaces:** keine Codeschnittstellen.
 
@@ -166,11 +166,11 @@ Abschnitte und Pflichtinhalte (Deutsch, kurz, ohne CA/PA-Beispiele):
 6. **Aus dem Quellcode** – Python 3.12, `python -m uv venv --python 3.12 .venv`, `python -m uv pip install --python .venv -e ".[dev]"`, Start `.venv\Scripts\python -m cotrainer`, Tests `.venv\Scripts\python -m pytest tests -q -m "not save"` (Tests mit echten Spielständen brauchen `COTRAINER_TEST_SAVE`), `.exe` mit `.\build.ps1`.
 7. **Lizenz** – MIT (`LICENSE`); mitgelieferte Software siehe `THIRD_PARTY_LICENSES.txt`, Spielstände gelesen mit [fmsave](https://github.com/rhiever/fmsave) (MIT).
 
-- [ ] **Step 1:** `README.md` mit den sieben Abschnitten schreiben; `pyproject.toml` ergänzen.
+- [ ] **Step 1:** `README.md` mit den sieben Abschnitten schreiben; `pyproject.toml` ergänzen; Version in `pyproject.toml` und `cotrainer/__init__.py` auf `1.0.0` (Task 2 liest sie über `__version__`, der Test vergleicht mit `cotrainer.__version__`).
 - [ ] **Step 2: Prüfen:** `.venv\Scripts\python -m uv pip install --python .venv -e ".[dev]"` läuft ohne Fehler (pyproject gültig); `git grep -n -I "Users\\\\[A-Z]" README.md` → keine Treffer; jeder genannte Befehl und Pfad stimmt mit `CLAUDE.md` und dem Code überein (`settings.settings_path()`, `saves.default_saves_dir()`).
 - [ ] **Step 3: Commit** – „README“.
 
-### Task 4: Pull Request und Release v0.1.0
+### Task 4: Pull Request und Release v1.0.0
 
 **Files:**
 - Modify: `HANDOFF.md` („Was bisher gemacht wurde“ neuer Punkt für Teil 4; „Nächste Schritte“ Punkt 2 erledigt)
@@ -182,5 +182,5 @@ Abschnitte und Pflichtinhalte (Deutsch, kurz, ohne CA/PA-Beispiele):
 - [ ] **Step 2:** `HANDOFF.md` nachtragen, committen, Branch pushen, Pull Request `teil-4-release` → `main` mit `gh pr create` (Titel „Teil 4: README, Lizenzhinweise, Release“, Beschreibung auf Deutsch: was drin ist, Testergebnis, offene Punkte; Abschlusszeile laut Commit-Anweisung).
 - [ ] **Step 3: Nutzer fragen**, ob gemergt und das Release angelegt werden soll (Release ist sichtbar für alle, die Zugriff auf das Repo haben). Erst nach Ja weiter.
 - [ ] **Step 4:** PR mergen (`gh pr merge --merge`), `main` lokal aktualisieren, `.\build.ps1` auf `main`, SHA-256 der `.exe` (`Get-FileHash dist\Co-Trainer.exe`).
-- [ ] **Step 5:** `gh release create v0.1.0 dist\Co-Trainer.exe --title "Co-Trainer 0.1.0" --notes-file <Scratchpad>\release-notes.md --target main`. Release-Text: Kurzbeschreibung, Starten mit Windows-Schutzhinweis, WebView2, „liest nur, keine Internetverbindung“, bekannte Grenzen (aus README Abschnitt 5), SHA-256.
-- [ ] **Step 6: Prüfen:** `gh release view v0.1.0 --json assets,tagName` zeigt `Co-Trainer.exe` mit der gebauten Größe; Repo weiterhin `PRIVATE` (`gh repo view --json visibility`).
+- [ ] **Step 5:** `gh release create v1.0.0 dist\Co-Trainer.exe --title "Co-Trainer 1.0.0" --notes-file <Scratchpad>\release-notes.md --target main`. Release-Text: Kurzbeschreibung, Starten mit Windows-Schutzhinweis, WebView2, „liest nur, keine Internetverbindung“, bekannte Grenzen (aus README Abschnitt 5), SHA-256.
+- [ ] **Step 6: Prüfen:** `gh release view v1.0.0 --json assets,tagName` zeigt `Co-Trainer.exe` mit der gebauten Größe; Repo weiterhin `PRIVATE` (`gh repo view --json visibility`).
