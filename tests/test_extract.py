@@ -461,11 +461,53 @@ def test_ravenna_scout_area(ravenna_data):
 
 
 def test_pick_tactic_takes_first_slot():
-    def slots(*act):
-        return [{'name': f'T{i}', 'active': a} for i, a in enumerate(act)]
-    assert extract.pick_tactic(slots(True, True, True))['name'] == 'T0'
-    assert extract.pick_tactic(slots(False, False, True))['name'] == 'T0'
+    assert extract.pick_tactic([{'name': f'T{i}', 'slot': i} for i in range(3)])['name'] == 'T0'
     assert extract.pick_tactic([]) is None
+
+
+def _tactics_man(idx, *names, broken=()):
+    """Synthetischer Block tactics_man: <u32 Index> <u16 Index+1>, dann je Taktik Kopf, Name und 22 Slots.
+    Taktiken in broken bekommen eine unbekannte Position und sind damit nicht lesbar."""
+    import struct
+    sub = b'\x02\x02\x02' + bytes(8) + b'\xff' + bytes(4) + struct.pack('<Q', 1)
+    out = b'..' + struct.pack('<IH', idx, idx + 1)
+    for k, name in enumerate(names):
+        raw = name.encode()
+        out += bytes.fromhex('2244001b00000000') + struct.pack('<I', len(raw)) + raw
+        for i in range(22):
+            pos = 0 if k in broken and i == 5 else 0x400
+            out += b'\x44\x00\x02' + struct.pack('<HH', pos, 0) + b'\x00\x01\x01' + struct.pack('<IQ', 1, 1) + sub
+    return extract.read_tactics({0: out}, {'tactics_man': 0})
+
+
+def test_read_tactics_places_two_and_three():
+    for idx in (1, 2):
+        saved = _tactics_man(idx, 'T0', 'T1', 'T2')
+        assert [s['slot'] for s in saved] == [0, 1, 2]
+        assert extract.pick_tactic(saved)['name'] == f'T{idx}'
+        assert extract.chosen_unread(saved) is None
+        assert all(len(s['slots']) == 11 for s in saved)
+
+
+def test_read_tactics_skipped_head_keeps_numbering():
+    saved = _tactics_man(2, 'T0', 'T1', 'T2', broken={1})
+    assert [(s['name'], s['slot']) for s in saved] == [('T0', 0), ('T2', 2)]
+    assert extract.pick_tactic(saved)['name'] == 'T2'
+    assert extract.chosen_unread(saved) is None
+
+
+def test_read_tactics_chosen_head_unreadable():
+    saved = _tactics_man(1, 'T0', 'T1', 'T2', broken={1})
+    assert extract.pick_tactic(saved)['name'] == 'T0'
+    assert extract.chosen_unread(saved) == 2          # Platz 2 gewählt, aber nicht lesbar
+
+
+def test_read_tactics_index_out_of_range_or_missing():
+    saved = _tactics_man(5, 'T0', 'T1')
+    assert not any(s['chosen'] for s in saved) and extract.chosen_unread(saved) is None
+    assert extract.pick_tactic(saved)['name'] == 'T0'
+    assert extract.chosen_unread([{'name': 'T0', 'slot': 0}]) is None
+    assert extract.chosen_unread([]) is None
 
 
 def test_active_index():

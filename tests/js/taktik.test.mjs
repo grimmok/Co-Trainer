@@ -151,3 +151,77 @@ test('helpFor: oop-Rollenkandidaten nach der Position gegen den Ball', () => {
   const h = T.helpFor(area, area.causers[0], pl(1,a), slot, R2);
   assert.equal(h[0].kind, 'rolle'); assert.equal(h[0].role, 'dm');
 });
+
+// ---- Zurückgestellte Randfälle aus Teil 3 ----
+test('helpFor: Rolle erst ab 1,0 besser; andere Phase und andere Position zählen nicht', () => {
+  const slot = {i:0,pos:'MC',ip:'cm',oop:'pcm'};
+  // pcm: Wor,Sta,Tck = 10 → 10; Kandidat scm: Pos,Dec,Mar = 10,9 → knapp unter +1
+  const R2 = {...ROLES, scm:{name:'Abschirmender Achter',ph:'oop',pos:['MC'],key:['Pos','Dec','Mar']}};
+  const a = {...all(10), Pos:10.9, Dec:10.9, Mar:10.9};
+  const area = T.areaRatings([{...slot,player:pl(1,all(8))}], R2).find(x=>x.key==='intens');
+  assert.deepEqual(T.helpFor(area, area.causers[0], pl(1,a), slot, R2).map(x=>x.kind), ['training','transfer']);
+  const b = {...a, Pos:11, Dec:11, Mar:11};
+  assert.equal(T.helpFor(area, area.causers[0], pl(1,b), slot, R2)[0].role, 'scm');
+  // ip-Rolle und Rolle für eine andere Position sind keine Kandidaten für einen oop-Bereich am MC
+  const R3 = {...ROLES, ipx:{name:'X',ph:'ip',pos:['MC'],key:['Pos']}, dcx:{name:'Y',ph:'oop',pos:['DC'],key:['Pos']}};
+  const c = {...all(8), Pos:20};
+  assert.deepEqual(T.helpFor(area, area.causers[0], pl(1,c), slot, R3).map(x=>x.kind), ['training','transfer']);
+});
+test('helpFor: Trainingsfokus auf das schwächste Attribut, auch ohne Verursacher-Liste', () => {
+  const slot = {i:0,pos:'MC',ip:'cm',oop:'pcm'};
+  const p = pl(1, {...all(12), Acc:6, Agg:9});
+  const area = T.areaRatings([{...slot,player:p}], ROLES).find(x=>x.key==='intens');
+  const names = {Acc:'Antritt', Agg:'Aggressivität'};
+  assert.match(T.helpFor(area, area.causers[0], p, slot, ROLES, names)[0].text, /Trainingsfokus auf Antritt$/);
+  assert.match(T.helpFor(area, null, p, slot, ROLES, names)[0].text, /Trainingsfokus auf Antritt$/);
+  assert.match(T.helpFor(area, {weak:[]}, pl(2,{}), slot, ROLES)[0].text, /Trainingsfokus auf Wor$/);   // ohne Werte: erstes Bereichsattribut
+});
+test('helpFor: unbekannte aktuelle Rolle – kein Rollenvorschlag, kein Fehler', () => {
+  const slot = {i:0,pos:'MC',ip:'cm',oop:'gibtsnicht'};
+  const p = pl(1, {...all(8), Wor:16, Sta:16, Tck:16});
+  const area = T.areaRatings([{...slot,player:p}], ROLES).find(x=>x.key==='intens');
+  assert.deepEqual(T.helpFor(area, area.causers[0], p, slot, ROLES).map(x=>x.kind), ['training','transfer']);   // ohne aktuelle Rolle fehlt der Vergleichswert
+});
+test('leadHints: alle Regeln, Mentalkarten zählen nicht für Trainingsregeln', () => {
+  const kinds = (t, ctx) => T.leadHints({training:t, mental:[]}, {avgAge:25, ...ctx}).map(x=>x.kind);
+  assert.deepEqual(kinds(['defensiv'], {family:'pressing'}), ['konflikt']);
+  assert.deepEqual(kinds(['defensiv'], {family:'counter'}), []);
+  for (const f of ['possession','pressing','wide']) assert.deepEqual(kinds(['offensive'], {family:f}), ['passt']);
+  assert.deepEqual(kinds(['offensive'], {family:'direct'}), []);
+  assert.deepEqual(kinds(['energisch'], {family:'possession',styleKey:'tikitaka'}), ['konflikt']);
+  assert.deepEqual(kinds(['energisch'], {family:'possession',styleKey:'vertical_tikitaka'}), ['passt']);
+  for (const f of ['pressing','counter','direct']) assert.deepEqual(kinds(['energisch'], {family:f}), ['passt']);
+  assert.deepEqual(kinds(['laptop'], {family:'counter'}), ['konflikt']);
+  assert.deepEqual(kinds(['laptop'], {family:'possession'}), []);
+  assert.deepEqual(kinds(['pragmatiker'], {styleKey:'tikitaka'}), ['konflikt']);
+  assert.deepEqual(kinds(['taktiker'], {}), ['passt']);
+  assert.deepEqual(kinds(['entwickler'], {avgAge:27}), []);              // erst über 27
+  assert.deepEqual(T.leadHints({training:[], mental:['gut','belastbar']}, {family:'pressing',styleKey:'gegenpress',avgAge:30}), []);
+  assert.deepEqual(T.leadHints({training:['defensiv']}, null), []);       // ohne Kontext kein Fehler
+  // mehrere Karten: Reihenfolge der Regeln, nicht der Auswahl
+  assert.deepEqual(kinds(['taktiker','defensiv','energisch'], {family:'pressing'}), ['konflikt','passt','passt']);
+});
+test('trainingWeak: Pressing-Baustellen nur bei Pressing-Stil, Reihenfolge wie focusKeys', () => {
+  const rated = T.AREAS.map(a => ({key:a.key, name:a.name, phase:a.phase}));
+  const fk = ['intens','pass','falle','fob'];
+  const on = T.trainingWeak(rated, fk, true), off = T.trainingWeak(rated, fk, false);
+  assert.deepEqual(on.pull.map(a=>a.key), fk); assert.deepEqual(on.skip, []);
+  assert.deepEqual(off.pull.map(a=>a.key), ['pass','fob']);
+  assert.deepEqual(off.skip.map(a=>a.name), ['Pressingintensität','Pressingfalle']);
+  assert.deepEqual(T.trainingWeak(rated, [], false), {pull:[], skip:[]});
+  assert.deepEqual(T.trainingWeak(undefined, ['gibtsnicht'], true), {pull:[], skip:[]});
+});
+test('sessionOrder: Feedback vor Baustellen vor Grundliste, Baustellen außerhalb der Liste kommen dazu', () => {
+  const base = ['Formation ohne Ball','Defensivblock','Defensive Positionierung','Pressinglinie'];
+  const A = k => T.AREAS.find(a=>a.key===k);
+  // Baustellen schwächste zuerst: Pressinglinie (in der Liste) vor Pressingfalle (neu); ip-Baustelle zählt hier nicht
+  const pull = [A('linie'), A('falle'), A('pass')];
+  assert.deepEqual(T.sessionOrder(base, pull, 'oop', []),
+    ['Pressinglinie','Pressingfalle','Formation ohne Ball','Defensivblock','Defensive Positionierung']);
+  assert.deepEqual(T.sessionOrder(base, pull, 'oop', ['Defensivblock']),
+    ['Defensivblock','Pressinglinie','Pressingfalle','Formation ohne Ball','Defensive Positionierung']);
+  // ohne Baustellen und Feedback bleibt die Grundliste unverändert
+  assert.deepEqual(T.sessionOrder(base, [], 'oop'), base);
+  const ip = ['Passstil','Spielaufbau','Formation mit Ball','Chancen kreieren'];
+  assert.deepEqual(T.sessionOrder(ip, [A('aufbau'), A('pass')], 'ip', []), ['Spielaufbau','Passstil','Formation mit Ball','Chancen kreieren']);
+});

@@ -123,6 +123,24 @@
       .sort((x, y) => x.avg - y.avg).map(a => a.key);
   }
 
+  // Baustellen fürs Training: Pressing-Bereiche zieht nur ein Stil mit Pressing vor; bei tiefem Block
+  // (z. B. Konterfußball) bleiben sie außen vor. Reihenfolge wie focusKeys (schwächste zuerst).
+  const PRESS_KEYS = ['linie', 'intens', 'falle'];
+  function trainingWeak(rated, focusKeys, pressing) {
+    const by = Object.fromEntries((rated || []).map(a => [a.key, a]));
+    const wa = (focusKeys || []).map(k => by[k]).filter(Boolean);
+    const skip = a => !pressing && PRESS_KEYS.includes(a.key);
+    return {pull: wa.filter(a => !skip(a)), skip: wa.filter(skip)};
+  }
+
+  // Einheiten einer Phase: Taktik-Feedback zuerst, dann Baustellen (schwächste zuerst), dann die Grundliste.
+  function sessionOrder(base, pull, phase, feedback) {
+    const fb = feedback || [], weak = (pull || []).map(a => a.name);
+    const rk = k => fb.includes(k) ? -1 : weak.includes(k) ? weak.indexOf(k) : weak.length;
+    const extra = (pull || []).filter(a => a.phase === phase && !base.includes(a.name)).map(a => a.name);
+    return [...extra, ...base].sort((x, y) => rk(x) - rk(y));
+  }
+
   function coachHints(coaching, rated, focusKeys) {
     const out = [], c = coaching || {};
     for (const a of rated || []) {
@@ -176,7 +194,8 @@
     return out;
   }
 
-  const api = {AREAS, areaRatings, helpFor, LEADERSHIP, LEAD_MAX, cleanLead, focusAreas, coachHints, tacticCoachGaps, leadHints};
+  const api = {AREAS, areaRatings, helpFor, LEADERSHIP, LEAD_MAX, cleanLead, focusAreas, PRESS_KEYS, trainingWeak, sessionOrder,
+    coachHints, tacticCoachGaps, leadHints};
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.TAKTIK = api;
 })(this);

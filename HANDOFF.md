@@ -139,6 +139,14 @@ Nutzerdaten:
     - Mit den Grenzen 13/11 hat Ravenna in den echten Daten keinen schwachen Bereich (alle acht „mittel“), aber Baustellen über die Regel mit 0,3.
     - **Vom Nutzer zu bestätigen:** die Grenze 0,3 unter dem Schnitt für Baustellen (Schätzung, nicht aus dem Spiel).
 
+20. **Kleinigkeiten aus Teil 3 erledigt (15.11. spät).**
+    - Training: Reihenfolge der Einheiten in `TAKTIK.sessionOrder` (Taktik-Feedback, dann Baustellen, schwächste zuerst, dann die Grundliste; vorher galt bei mehreren Baustellen die Reihenfolge der Grundliste). `TAKTIK.trainingWeak`: Pressing-Baustellen (Pressinglinie, -intensität, -falle) zieht nur ein Stil mit Pressing vor (Gegenpressing, Vertikales Tiki-Taka oder Pressinglinie „Hoch“ in `config.json`); sonst bleiben sie weg, mit Satz unter der Überschrift („… ist nicht vorgezogen, weil „Konterfußball“ nicht hoch presst“).
+    - Bereiche und Baustellen werden nur einmal je Analyse gerechnet (`areaInfo`, `WeakMap`); `renderSug` hält die Analyse wie `render` (`withAnalysis`), `weakIdx` ist weg.
+    - Karte „Trainer“: die Tabellen „Training“ und „Mentales“ erscheinen nur, wenn sie Werte haben.
+    - Python: `read_tactics` gibt `active_slot` (gewählter Platz laut Index, nur wenn es den Kopf gibt) statt des ungenutzten `active`. Zeigt der Index auf einen nicht lesbaren Kopf, setzt `chosen_unread` `tactic.chosen_unread` (Platz ab 1); die Taktik-Karte warnt dann, welche Taktik stattdessen gezeigt wird.
+    - Tests: Plätze 2/3, übersprungener Kopf behält die Platznummer, nicht lesbare Spieltaktik, Index außerhalb (synthetisches `tactics_man`); JS: Randfälle `helpFor` (Grenze +1,0, Phase/Position, ohne Verursacher, unbekannte Rolle), alle Regeln von `leadHints`, `trainingWeak`, `sessionOrder`. Oberfläche im Entwicklermodus geprüft (Edge headless über DevTools-Protokoll, keine Konsolenfehler).
+    - **Fehler Osijek behoben:** Die Oberfläche zeigte bei Osijek nichts, weil die Spielstile „Flügelspiel“ und „Direkt / lange Bälle“ die Positionsgruppe `ST` nutzen, die in `PG` fehlte (`TypeError … reading 'some'` in `styleMods`). Aufgefallen ist es erst, seit `GNIW` als Flügelspiel erkannt wird; vorher stürzte nur die Handauswahl dieser Stile ab. `PG.ST` ergänzt, Test `tests/test_ui_static.py` (jede in Stil-Modifikatoren benutzte Gruppe muss in `PG` stehen). Osijek und Ravenna mit allen sechs Stilen in der Oberfläche geprüft.
+
 ## Erkenntnisse zum Spielstand-Format
 
 ### Container
@@ -358,7 +366,7 @@ Grundlage: `Trainertest 2.fm` (unverändert) gegen `Trainertest 2 traainer.fm` (
 
 ## Nächste Schritte
 
-### Als Nächstes (Stand 15.11. abends, `main` = Teile 1–3 + aktive Taktik, `dist\Co-Trainer.exe` vom 15.11. 17:58, 133 Tests grün)
+### Als Nächstes (Stand 15.11. spät, `main` = Teile 1–3 + aktive Taktik + Kleinigkeiten aus Teil 3 (Punkt 20), `dist\Co-Trainer.exe` vom 15.11. 19:32 mit Punkt 20, 138 Tests grün)
 
 1. **GitHub einrichten (begonnen, wartet auf den Nutzer).** Laut Nutzer gibt es schon ein Repository; die Adresse fehlt noch, im Projekt ist kein Remote eingetragen.
    - `gh` ist installiert (`C:\Program Files\GitHub CLI\gh.exe`, in der laufenden Sitzung noch nicht im PATH), aber nicht angemeldet: `gh auth login` (Browser, HTTPS).
@@ -368,7 +376,7 @@ Grundlage: `Trainertest 2.fm` (unverändert) gegen `Trainertest 2 traainer.fm` (
 2. **Teil 4 planen und bauen:** README (Start, Windows-Schutzhinweis wegen fehlender Signatur, WebView2), Lizenzhinweise (MIT für Co-Trainer und fmsave), persönliche Daten aus dem Repo nehmen (siehe 1), GitHub-Release mit `Co-Trainer.exe`.
 3. **Rollentest (B.1)** hat Vorrang bei der Dekodierung: bei Osijek sind 17 von 22 Rollen unbekannt, bei „Ravenna 2 spieltaktik“ (5-2-3) 20.
 4. **Vom Nutzer zu bestätigen:** siehe A.7 (offen: Konter-/Ballbesitz-Annäherungen der Stil-Codes, Karte → Tendenz bei `sure:false`, Bereiche und Baustellen-Grenze 0,3 gegen „Taktische Effektivität“, ob in „2 spieltaktik“ die 5-2-3-Taktik die Spieltaktik ist, Stufengrenzen der Trainerbewertungen, Name „Co-Trainer“).
-5. **Zurückgestellte Kleinigkeiten aus Teil 3** (bei Gelegenheit): Testlücken (Randfälle von `helpFor`/`leadHints`, Sortierung der Trainingseinheiten, Taktik-Plätze 2/3, Nummerierung bei übersprungenem Taktikkopf); `areas(an)` und `analyze()` werden pro Darstellung mehrfach gerechnet; Pressing-Baustellen werden auch bei Konterstilen im Training vorgezogen; bei leerem `coaching` erscheint trotzdem die Mental-Tabelle; ein Taktikindex, der auf einen nicht lesbaren Kopf zeigt, fällt ohne Hinweis auf Platz 1 zurück; Feld `active` in `read_tactics` ist ungenutzt.
+5. ~~Zurückgestellte Kleinigkeiten aus Teil 3~~ erledigt (Punkt 20). Aufgefallen: Durchschnitte im Training und im Taktik-Reiter stehen mit Punkt statt Komma (z. B. „Ø 10.4“).
 6. **Mögliche Verbesserungen:** Wechselchance für frisch gewechselte Spieler (`club_join_date` unklar), Ligen ohne Namen („Wettbewerb 6026“), „Kein Scouting“ (welche Spieler den Mitarbeitern bekannt sind), Zwischenspeicher fürs Einlesen.
 
 ### A. Umbau zum Programm „Co-Trainer“ (Vorrang)

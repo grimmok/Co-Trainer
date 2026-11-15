@@ -467,6 +467,15 @@ def pick_tactic(saved):
     return next((s for s in saved if s.get('chosen')), saved[0] if saved else None)
 
 
+def chosen_unread(saved):
+    """Platz (ab 1) der im Spiel gewählten Taktik, wenn ihr Kopf nicht lesbar war und pick_tactic deshalb
+    auf den ersten lesbaren Platz zurückfällt; sonst None."""
+    want = next((s['active_slot'] for s in saved if s.get('active_slot') is not None), None)
+    if want is None or any(s.get('slot') == want for s in saved):
+        return None
+    return want + 1
+
+
 def read_tactics(frames, names):
     """Eigene (benannte) Taktiken des Managers mit Positionen und Rollen mit/gegen den Ball."""
     if 'tactics_man' not in names:
@@ -475,6 +484,9 @@ def read_tactics(frames, names):
     out = []
     heads = list(TACTIC_HEAD.finditer(t))
     chosen = active_index(t, heads[0].start()) if heads else None
+    if chosen is not None and chosen >= len(heads):
+        chosen = None
+    # slot zählt alle Köpfe, auch nicht lesbare: so bleibt die Platznummer wie im Spiel
     for slot, m in enumerate(heads):
         ln = m.group(2)[0]
         name = t[m.end():m.end() + ln].decode('utf-8', 'replace').strip()
@@ -520,9 +532,8 @@ def read_tactics(frames, names):
             x += dx if a['side'] == 0x20 else -dx if a['side'] == 0x10 else 0
             slots.append([a['pos'], x, y, ip[0] if ip else d_ip, oop[0] if oop else d_oop,
                           ip[1] if ip else '?', oop[1] if oop else '?', b['pos']])
-        # active: Bedeutung des Bytes unklar, bei Standardnamen „Taktik“ immer 02; zur Auswahl taugt es nicht (pick_tactic)
-        out.append(dict(name=name, active=m.group(1) == b'\x02', slots=slots, unknown=unknown,
-                        style_name=style_name, style_code=style_code, slot=slot, chosen=slot == chosen))
+        out.append(dict(name=name, slots=slots, unknown=unknown, style_name=style_name, style_code=style_code,
+                        slot=slot, chosen=slot == chosen, active_slot=chosen))
     return out
 
 
@@ -1192,6 +1203,10 @@ def _analyse(save, frames, names, cfg, progress):
         st = pick_tactic(saved)
         tactic.update(name=st['name'], slots=st['slots'], source='Spielstand', unknown_roles=st['unknown'],
                       saved=list(dict.fromkeys(x['name'] for x in saved)))
+        miss = chosen_unread(saved)
+        if miss:
+            tactic['chosen_unread'] = miss
+            log(f'Gewählte Taktik auf Platz {miss} nicht lesbar – nutze Platz {st["slot"] + 1}')
         if st['style_name']:
             tactic['style_name'] = st['style_name']
             if st['style_code'] in STYLE_CODES:
