@@ -115,6 +115,15 @@ Nutzerdaten:
     - Änderungsdatum aller 45 `.fm`-Dateien blieb unverändert.
     - Osijek-Finanzen per Screenshot bestätigt (14.11.). Ein Einlesen dauert nun rund 1,5 bis 2 Minuten, weil beide Leser entpacken.
 
+18. **Teil 2b (15.11.): Scouting im Transferbereich.** Branch `teil-2b-scouting`, sechs Tasks.
+    - `cotrainer/nations.py`: Kontinent und Region je Land aus der Nationentabelle; alle 251 Länder mit deutschem Namen (502 Namen gelesen). Die alte Regex hörte bei 195 auf, weil das Byte nach einem Namen ein Grammatik-Flag 0–4 ist und manche Einträge kein Kürzel haben.
+    - fmsave liefert jetzt Nationalität der Spieler sowie Land und Reputation der Vereine. Der fmsave-Verein mit uid 0 (KS Besa) wird intern zu `2**31`, weil 0 „vereinslos“ heißt.
+    - Ligastufe aus der mittleren Vereinsreputation; Staffeln über `league_base` zusammengefasst (Ravenna: Serie A 1, Serie BKT 2, Serie C 3; Serie D hat keine Spiele im Spielstand).
+    - Pool nach Scoutinggebiet. Sichtbare Auswahl `vis` (3.000, ohne CA/PA; Reihenfolge: Wechselchance-Band, Vereinsreputation, vereinslos, Vertragsende) plus Qualitätsauswahl (4.000).
+    - Wechselchance aus der Vereinsreputation statt der Vereinsstärke (fmsave-Weg); der Abstand nach unten ist auf −10 begrenzt.
+    - Drei Informationsstufen in der Oberfläche (Aus, Scoutbericht, Werte) mit Hinweis vor dem Hochschalten; gespeichert in `settings.json`.
+    - **Ravenna:** Scoutinggebiet 4 (Eigenes Land), 6.953 Spieler im Gebiet, Pool 4.616, davon 3.000 `vis`.
+
 ## Erkenntnisse zum Spielstand-Format
 
 ### Container
@@ -258,7 +267,7 @@ Grundlage: `Trainertest 2.fm` (unverändert) gegen `Trainertest 2 traainer.fm` (
 ### Scoutinggebiet (gelöst am 10.11.)
 
 - Einstellung im Spiel, sieben Stufen. Die Spielerdatenbank im Spiel zeigt dann automatisch Spieler dieses Gebiets.
-- **Fundort:** Abschnitt `humans`, ein Byte im Muster `33 00 <Stufe> <u32> 20 00 01 00 <Datum>`. Gelesen von `read_scout_area` in `cotrainer/extract.py`; steht als `meta.scout_area` (Zahl) und `meta.scout_area_name` in den Daten, die Oberfläche nutzt es noch nicht.
+- **Fundort:** Abschnitt `humans`, ein Byte im Muster `33 00 <Stufe> <u32> 20 00 01 00 <Datum>`. Gelesen von `read_scout_area` in `cotrainer/extract.py`; steht als `meta.scout_area` (Zahl) und `meta.scout_area_name` in den Daten; die Transfervorschläge filtern seit Teil 2b danach.
 - **Werte**, abgeglichen mit benannten Spielständen des Nutzers (Ravenna alle sieben, Paris 2 und 4):
 
   | Wert | Stufe | Beispiel Ravenna |
@@ -276,13 +285,14 @@ Grundlage: `Trainertest 2.fm` (unverändert) gegen `Trainertest 2 traainer.fm` (
 - Bei „Kein Scouting“ zeigt das Spiel laut Nutzer nur Spieler, die den Mitarbeitern bekannt sind. Wo diese Bekanntheit im Spielstand steht, ist nicht untersucht.
 - Das Muster greift nicht bei `Trainertest .fm` (zwei Manager) und nicht bei den älteren Karrieren (Ndoye, Curaçao, China; ältere Spielversion). Dort meldet `cotrainer/extract.py` „nicht gefunden“.
 - **Verworfen:** Der 4-Zeichen-Code in `scout_man` (`AcSP`/`blcP`) und der Filterblock daneben sind nicht das Scoutinggebiet. Sie gehören zur Spielersuche (Sortierspalte und ein Filter) und sind in allen Gebiets-Spielständen vom 10.11. gleich. Die Marken stehen rückwärts im Spielstand (`blcP` = `Pclb`, `manP` = `Pnam`, `frlp` = `plrf`).
-- **Angrenzende Ligen (vom Nutzer am 10.11. genannt):** bei Ravenna (Serie C/B) sind das Serie B, Serie C und Serie D, also die eigene Spielklasse plus je eine Stufe darüber und darunter im selben Land. Nicht geklärt: ob bei „Serie C“ alle Staffeln gemeint sind (Annahme Claude: ja) und wie die Ligastufe aus dem Spielstand gelesen wird (bisher nicht dekodiert). Die Zuordnung Land → Region/Kontinent ist gelöst, siehe unten.
-- **Ländernamen (10.11.):** `lang_db.dat`, Frame 64 (deutsch): Einträge `Datenbank-Nr.(4) len Name 00 len Kurzname 00 03 00 00 00 Kürzel len Adjektiv 00`, z. B. 776 Italien ITA, 769 Frankreich FRA, 771 Deutschland GER, 1657 Uruguay URU. 195 Länder so gelesen. Die Nummern gruppieren sich grob nach Kontinent (Afrika 5–55, Asien 106–145, Nord-/Mittelamerika 359–389, Europa 752–802, Ozeanien 1435–1444, Südamerika 1649–1662), mit Ausreißern (z. B. Montenegro, Gibraltar, Monaco weit außerhalb). Regionennamen („Südeuropa“) stehen weder in `lang_db.dat` noch in `lang_db_general.dat`. fmsave liefert je Spieler `nation_id` und die Tabelle `nation_id → database_id`, aber keine Kontinente oder Regionen.
+- **Angrenzende Ligen (vom Nutzer am 10.11. genannt):** bei Ravenna (Serie C/B) sind das Serie B, Serie C und Serie D, also die eigene Spielklasse plus je eine Stufe darüber und darunter im selben Land. Nicht geklärt: ob bei „Serie C“ alle Staffeln gemeint sind (Annahme Claude: ja). Seit Teil 2b wird die Ligastufe aus der mittleren Vereinsreputation abgeleitet (Annahme, nicht bestätigt). Die Zuordnung Land → Region/Kontinent ist gelöst, siehe unten.
+- **Ländernamen (10.11.):** `lang_db.dat`, Frame 64 (deutsch): Einträge `Datenbank-Nr.(4) len Name 00 len Kurzname 00 03 00 00 00 Kürzel len Adjektiv 00`, z. B. 776 Italien ITA, 769 Frankreich FRA, 771 Deutschland GER, 1657 Uruguay URU. 195 Länder so gelesen (Stand 10.11.; seit 15.11. alle 251 in `cotrainer/nations.py`, siehe Punkt 18). Die Nummern gruppieren sich grob nach Kontinent (Afrika 5–55, Asien 106–145, Nord-/Mittelamerika 359–389, Europa 752–802, Ozeanien 1435–1444, Südamerika 1649–1662), mit Ausreißern (z. B. Montenegro, Gibraltar, Monaco weit außerhalb). Regionennamen („Südeuropa“) stehen weder in `lang_db.dat` noch in `lang_db_general.dat`. fmsave liefert je Spieler `nation_id` und die Tabelle `nation_id → database_id`, aber keine Kontinente oder Regionen.
 - **Kontinent und Region je Land (10.11., aus `game_db`):** Die Nationentabelle (251 Zeilen, Aufbau wie `NATION_TABLE` in fmsave, `_layouts/fm26_26_3_2.py`) lässt sich mit den dortigen 14 Schritten ablaufen. Im 9. Schritt (24 feste Bytes) stehen:
   - Byte 1 = **Kontinent**: 0 Afrika, 1 Asien (inkl. Australien), 2 Europa, 3 Nord-/Mittelamerika, 4 Ozeanien, 5 Südamerika, 255 keiner (aufgelöste Staaten u. Ä.). Stimmt bei allen geprüften Ländern.
   - Bytes 5–8 (u32) = **Regions-Nummer**, sehr wahrscheinlich das, was das Spiel als Region nimmt. Europa: 4 = Österreich, Belgien, Tschechien, Deutschland, Liechtenstein, Luxemburg, Polen …; 5 = Bulgarien, Ungarn, Rumänien, Serbien …; **11 = Albanien, Bosnien und Herzegowina, Kroatien, Italien, Malta, San Marino, Slowenien, Montenegro**; 12 = England, Nordirland, Irland, Schottland, Wales; 24 = Dänemark, Finnland, Island, Norwegen, Schweden; 25 = Andorra, Frankreich, Portugal, Spanien, Gibraltar; 26 = Armenien, Aserbaidschan, Zypern, Georgien, Griechenland, Nordmazedonien; 27 = Belarus, Estland, Lettland, Litauen, Russland. Südamerika: 21 = Argentinien, Brasilien, Chile, Paraguay, Uruguay; 22 = Bolivien, Kolumbien, Ecuador, Peru, Venezuela.
   - **Vom Nutzer am 10.11. bestätigt:** Das Scoutinggebiet „Südeuropa“ (Ravenna) ist genau Region 11. Scoutingstufe 5 („Region“) = alle Länder mit derselben Regions-Nummer wie das Land des eigenen Vereins; Stufe 6 („Kontinent“) = derselbe Kontinent-Code. Für andere Regionen als 11 ist das eine Übertragung, nicht einzeln geprüft.
-  - 56 der 251 Länder haben in der Namensliste aus `lang_db.dat` noch keinen Namen (Regex zu eng); noch nicht in `cotrainer/extract.py`.
+  - Seit 15.11. haben alle 251 Länder einen deutschen Namen (`cotrainer/nations.py`, 502 Namen); der Fehler war, dass das Byte nach dem Namen ein Grammatik-Flag 0–4 ist und manche Einträge kein Kürzel haben.
+  - Kosovo liegt laut Nationentabelle ebenfalls in Region 11 (Südeuropa), steht aber nicht in der Liste oben.
 - Die Gebiets-Spielstände sind Build 27.0.1+2494687 (vorher 27.0.0+2493426).
 
 ## Getroffene Entscheidungen
@@ -315,12 +325,14 @@ Grundlage: `Trainertest 2.fm` (unverändert) gegen `Trainertest 2 traainer.fm` (
 - **Unbekannter Einfluss der Spieleranweisungen:** Ob individuelle Spieleranweisungen die Unterblöcke verändern und damit den Fingerabdruck brechen, ist ungeprüft.
 - **Fehlende Spieler:** Beim eigenen Leser (Rückfall) fehlen einzelne Spieler, z. B. Otávio und Ikoné bei Paris, und Leihspieler werden nicht immer erkannt. Mit fmsave als Quelle ist das gelöst.
 - **Einlesen dauert rund zwei Minuten:** Beide Leser (fmsave und der eigene) entpacken den Spielstand je einmal.
-- **Nicht ausgelesen werden:** Scoutingbudget, Staffattribute anderer Trainer, Teamanweisungen und die Ligastufe (fmsave liest Scoutingbudget und Staffattribute). Das Scoutinggebiet wird gelesen, aber die Transfervorschläge filtern noch nicht danach.
+- **Nicht ausgelesen werden:** Scoutingbudget, Staffattribute anderer Trainer, Teamanweisungen (fmsave liest Scoutingbudget und Staffattribute). Die Ligastufe wird nur aus der Vereinsreputation abgeleitet.
 - **Trainertendenzen:** Die 15 Neigungen des eigenen Managers werden gelesen, stehen aber überall auf 10. Woher das Spiel die angezeigten Tendenzen nimmt, ist offen; im Programm werden sie pro Karriere ausgewählt.
 - **Zielstrebigkeit und Streitlust des Managers ändern sich zwischen Spielständen ohne Zutun** (z. B. Paris: 14 → 10); Ursache unbekannt.
 - **Torwartwahl:** Durch die Gewichtung „Ballspielender Torwart“ wählt das Programm bei Paris Nkambadio statt Trapp.
 - **Spielstandwahl:** Backups sind ausgeschlossen, aber `find_save` nimmt weiterhin den neuesten Spielstand *jeder* Karriere (keine Einschränkung auf einen Manager).
-- **Ungeprüfte Werte:** Das garantierte Mindestbudget für die nächste Saison ist nicht mit dem Spiel abgeglichen. Die Wechselchance ist eine Annahme.
+- **Ungeprüfte Werte:** Das garantierte Mindestbudget für die nächste Saison ist nicht mit dem Spiel abgeglichen. Die Wechselchance ist eine Annahme (seit Teil 2b aus der Vereinsreputation).
+- **Stufe „Aus“ voller Spieler ohne spielbare Liga:** Von den 3.000 `vis`-Spielern bei Ravenna haben rund 2.000 keine spielbare Liga (vereinslos oder Serie-D-Vereine), die meisten mit Wechselchance in den 90ern. Sie dominieren die Liste.
+- **Osijek-Kontostand:** Der Test prüft nur noch „> 0“, weil der Nutzer den Spielstand neu gespeichert hat. Der Screenshot-Wert vom 14.11. war 6.713.387 €.
 
 ## Nächste Schritte
 
@@ -328,15 +340,15 @@ Grundlage: `Trainertest 2.fm` (unverändert) gegen `Trainertest 2 traainer.fm` (
 
 Stand 14.11.: **Teil 1 ist gebaut** (acht Tasks des Plans, Branch `programm-entwurf`), siehe „Was bisher gemacht wurde“ Punkt 15.
 
-1. **Nutzer probiert `dist\Co-Trainer.exe` aus** (liegt gebaut vor; neu bauen mit `.\build.ps1`). Das ist der einzige ungeprüfte Teil von Teil 1: Aus der `.exe` heraus hat noch niemand bis zum Ergebnis durchgeklickt. Zu prüfen:
+1. ~~Nutzer probiert `dist\Co-Trainer.exe` aus~~: Probelauf aus der `.exe` siehe Punkt 17, zuletzt am 15.11. mit Teil 2b neu gebaut und gestartet. Ursprüngliche Prüfliste:
    - erster Start zeigt Schritt 1 mit dem vorgeschlagenen Ordner (die echten Einstellungen in `%APPDATA%\Co-Trainer` sind noch nicht angelegt);
    - Ravenna bis zum Ergebnis, alle fünf Bereiche, Häkchen, „Hell/Dunkel“, „Neu einlesen“, „Spielstand wechseln…“;
    - Paris FC (ohne eigene Taktik → Standardformation 4-2-3-1);
    - ein Nationaltrainer-Spielstand (Südkorea 2028 oder Curaçao) → erwartet ist die Meldung „kein Kader des eigenen Vereins gefunden“ mit „Anderen Spielstand wählen…“;
    - Programm schließen und neu starten: Schritt 1 entfällt, Farbschema bleibt.
    - Windows zeigt beim ersten Start „Der Computer wurde durch Windows geschützt“, weil die `.exe` nicht signiert ist.
-2. ~~Unabhängige Durchsicht des Codes~~ erledigt am 14.11., siehe „Was bisher gemacht wurde“ Punkt 16. Die Korrekturen stecken noch nicht in `dist\Co-Trainer.exe`; vor dem Probelauf neu bauen (`.\build.ps1`).
-3. **Branch `programm-entwurf` nach `main` übernehmen**, wenn der Nutzer zufrieden ist (bisher nichts gepusht, kein PR).
+2. ~~Unabhängige Durchsicht des Codes~~ erledigt am 14.11., siehe „Was bisher gemacht wurde“ Punkt 16. Die Korrekturen stecken in der `.exe` (neu gebaut am 15.11.).
+3. ~~Branch `programm-entwurf` nach `main` übernehmen~~ erledigt am 15.11. (in `main` gemergt).
 4. **Zurückgestellte Kleinigkeiten aus Teil 1** (nur auf Wunsch des Nutzers):
    - Rollenbeschriftungen auf dem Spielfeld überlappen bei benachbarten Spielern (war schon in der alten Seite so).
    - `app.main` zeigt die WebView2-Meldung bei jedem Startfehler, auch bei einem anderen.
@@ -344,17 +356,20 @@ Stand 14.11.: **Teil 1 ist gebaut** (acht Tasks des Plans, Branch `programm-entw
    - Alte Spielstände (China 2028) brauchen rund 160 s; es gibt keinen Zwischenspeicher.
    - Die Wahl aus Schritt 3 überschreibt bei jedem Start die gemerkten sichtbaren Bereiche (so im Plan; ggf. die letzte Wahl vorbelegen).
 5. **Danach je einen Plan schreiben und bauen** (Skill `superpowers:writing-plans`, dann `superpowers:executing-plans`):
-   - Teil 2: fmsave als Datenquelle, Kader nur erste Mannschaft, Nationalität, Scoutinggebiet als Filter, drei Informationsstufen der Transfervorschläge.
+   - ~~Teil 2~~ gebaut (fmsave als Datenquelle, Kader nur erste Mannschaft, Nationalität, Scoutinggebiet als Filter, drei Informationsstufen; Punkte 17 und 18), bis auf die Bestätigungen unter Punkt 7.
    - Teil 3: neuer Taktik-Reiter (Schwachstellen, Verursacher, Abhilfe), Trainerbewertungen als Textstufen, Auswahl der Trainertendenzen pro Karriere, Trainingsfokus.
    - Teil 4: README, Lizenzhinweise, GitHub-Release.
    - Für den Plan von Teil 2 geklärt (Punkt 16): fmsave löst weder Nationaltrainer noch zwei Manager; die Meldung `require_squad` und der eigene Leser als Rückfall bleiben. Gepackt wird fmsave über `build.ps1` (siehe Punkt 17).
 6. **Für Teil 2 noch zu dekodieren:**
-   - Ligastufe je Wettbewerb (für „Angrenzende Ligen“ = eigene Spielklasse ± 1 im selben Land).
-   - Die 56 Länder ohne deutschen Namen (Regex für `lang_db.dat`, Frame 64, ist zu eng).
-   - Nationentabelle (Kontinent, Region) in den Leser übernehmen; bisher nur im Scratchpad erkundet.
+   - ~~Ligastufe je Wettbewerb~~ (aus Reputation abgeleitet, Bestätigung offen), ~~56 Länder ohne Namen~~ und ~~Nationentabelle~~ erledigt in Teil 2b.
    - Optional: welche Spieler den Mitarbeitern bekannt sind (für „Kein Scouting“; bis dahin gilt die Regel „vertragslose Spieler der Vereinsnation“).
 7. **Vom Nutzer zu bestätigen, wenn es sich ergibt:**
    - ob bei „Angrenzende Ligen“ alle Serie-C-Staffeln gemeint sind (Annahme Claude: ja);
+   - **Teil 2b:** Ligastufe aus Reputation (prüfen in der Spielerdatenbank mit Scoutinggebiet „Angrenzende Ligen“);
+   - Regionen außer 11 sind übertragen, nicht geprüft (Kosovo liegt laut Nationentabelle ebenfalls in Region 11, Südeuropa, steht aber nicht in der bisherigen Liste);
+   - neue Wechselchance (aus Vereinsreputation);
+   - neuer Screenshot der Osijek-Finanzen;
+   - der Schalter „Auch außerhalb meines Scoutinggebiets suchen“ fehlt noch.
    - Stil-Code `TREV` = Vertikales Tiki-Taka;
    - Stufengrenzen der Trainerbewertungen unterhalb von 18 (bisher nur aus Profil-Screenshots abgeleitet);
    - ob der Name „Co-Trainer“ frei ist (nicht geprüft).
