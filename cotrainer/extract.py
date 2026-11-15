@@ -410,8 +410,12 @@ ROLE_FP = {
     ('oop', 35, ((38,), (54,))): ('twm', 'ÄMF', 'Äußerer Mittelfeldspieler'),
     ('oop', 42, ((43,), (54,))): ('cfo', 'MS', 'Mittelstürmer'),
 }
-# Stil-Code im Taktikkopf -> Schlüssel in STYLES (ui/index.html). Weitere Codes erst nach Bestätigung eintragen.
-STYLE_CODES = {'TREV': 'vertical_tikitaka', 'EGEG': 'gegenpress'}
+# Stil-Code im Taktikkopf -> Schlüssel in STYLES (ui/index.html). Die Codes sind rückwärts geschriebene englische Kürzel.
+# Stilname im Spielstand je Code: TREV Vertikales Tiki-Taka, EGEG Gegenpressing, TNOC Ballbesitzspiel, IKIT Tiki-Taka,
+# TUOR Langer Hafer, GNIW Flügelspiel, ERID Catenaccio. Ballbesitzspiel und Catenaccio sind nur angenähert, weil
+# Co-Trainer sechs Stilfamilien hat (vertical_tikitaka, tikitaka, gegenpress, counter, wings, direct).
+STYLE_CODES = {'TREV': 'vertical_tikitaka', 'EGEG': 'gegenpress', 'TNOC': 'tikitaka', 'IKIT': 'tikitaka',
+               'TUOR': 'direct', 'GNIW': 'wings', 'ERID': 'counter'}
 # Ersatzrolle, wenn ein Fingerabdruck (noch) unbekannt ist
 ROLE_DEFAULT = {'GK': ('gk', 'gk'), 'SW': ('cb', 'cb'), 'DC': ('cb', 'cb'), 'DR': ('fb', 'fb'), 'DL': ('fb', 'fb'),
                 'WBR': ('wb', 'wb'), 'WBL': ('wb', 'wb'), 'DM': ('dm', 'dm'), 'MC': ('cm', 'cm'),
@@ -443,6 +447,11 @@ def _tactic_entry(t, p):
 # Kopf einer eigenen Taktik: 22 44 00 1b 00 <?> 00 <Art: 00 eigene, 02 aktiv> <Länge u32> Name.
 # Das Byte <?> ist meist 00, bei „Ravenna vert tiki taka.fm“ 01 (Bedeutung unbekannt, 15.11.).
 TACTIC_HEAD = re.compile(rb'\x22\x44\x00\x1b\x00[\x00-\xff]\x00([\x00\x02])(.)\x00\x00\x00', re.S)
+
+
+def pick_tactic(saved):
+    """Die aktive Taktik ist der erste Platz in tactics_man (Befund aus fünf Ravenna-Spielständen, 15.11.)."""
+    return saved[0] if saved else None
 
 
 def read_tactics(frames, names):
@@ -496,6 +505,7 @@ def read_tactics(frames, names):
             x += dx if a['side'] == 0x20 else -dx if a['side'] == 0x10 else 0
             slots.append([a['pos'], x, y, ip[0] if ip else d_ip, oop[0] if oop else d_oop,
                           ip[1] if ip else '?', oop[1] if oop else '?', b['pos']])
+        # active: Bedeutung des Bytes unklar, bei Standardnamen „Taktik“ immer 02; zur Auswahl taugt es nicht (pick_tactic)
         out.append(dict(name=name, active=m.group(1) == b'\x02', slots=slots, unknown=unknown,
                         style_name=style_name, style_code=style_code))
     return out
@@ -1164,7 +1174,7 @@ def _analyse(save, frames, names, cfg, progress):
     # Taktik: Positionen + Rollen aus dem Spielstand, Anweisungen/Feedback aus config.json
     tactic = dict(club_cfg.get('tactic', {}))
     if saved:
-        st = next((x for x in saved if x['active']), saved[0])
+        st = pick_tactic(saved)
         tactic.update(name=st['name'], slots=st['slots'], source='Spielstand', unknown_roles=st['unknown'],
                       saved=list(dict.fromkeys(x['name'] for x in saved)))
         if st['style_name']:

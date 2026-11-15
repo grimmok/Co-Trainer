@@ -458,3 +458,33 @@ def test_ravenna_scout_area(ravenna_data):
     vis = [p for p in inside if p['vis']]
     assert any(p['lg'] == 'Serie BKT' for p in vis) and any(p['weaker_league'] for p in vis)
     assert not any(not p['club'] and p['age'] < 18 for p in vis)
+
+
+def test_pick_tactic_takes_first_slot():
+    def slots(*act):
+        return [{'name': f'T{i}', 'active': a} for i, a in enumerate(act)]
+    assert extract.pick_tactic(slots(True, True, True))['name'] == 'T0'
+    assert extract.pick_tactic(slots(False, False, True))['name'] == 'T0'
+    assert extract.pick_tactic([]) is None
+
+
+def test_style_codes_known():
+    keys = {'vertical_tikitaka', 'tikitaka', 'gegenpress', 'counter', 'wings', 'direct'}
+    codes = ['TREV', 'EGEG', 'TNOC', 'IKIT', 'TUOR', 'GNIW', 'ERID']
+    assert all(extract.STYLE_CODES[c] in keys for c in codes)
+
+
+@pytest.mark.save
+@pytest.mark.parametrize('suffix,code', [(' ball', 'TNOC'), (' gegenpressing', 'EGEG'), ('  tiki taka', 'IKIT'),
+                                         (' langer hafer', 'TUOR'), (' vert tiki taka', 'TREV')])
+def test_newest_ravenna_saves_pick_first_tactic(suffix, code):
+    import os
+    from conftest import DEFAULT_SAVE
+    path = os.path.join(os.path.dirname(DEFAULT_SAVE), f"Haribaert Kachinski – Ravenna{suffix}.fm")
+    if not os.path.isfile(path):
+        pytest.skip(f"Spielstand fehlt: {path}")
+    frames, offs = extract.read_frames(path)
+    names = extract.directory(frames, offs)
+    saved = extract.read_tactics(frames, names)
+    assert len(saved) == 3
+    assert extract.pick_tactic(saved)['style_code'] == code
