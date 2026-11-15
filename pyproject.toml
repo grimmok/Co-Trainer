@@ -1,11 +1,14 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "cotrainer"
-version = "0.1.0"
+version = "1.0.0"
 description = "Co-Trainer: liest einen Football-Manager-27-Spielstand und analysiert Kader, Taktik, Transfers und Training."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.12"
 dependencies = ["zstandard", "pywebview", "fmsave==0.11.0"]
 
