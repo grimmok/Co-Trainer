@@ -127,6 +127,14 @@ Nutzerdaten:
     - Drei Informationsstufen in der Oberfläche (Aus, Scoutbericht, Werte) mit Hinweis vor dem Hochschalten; gespeichert in `settings.json`.
     - **Ravenna:** Scoutinggebiet 4 (Eigenes Land), 6.953 Spieler im Gebiet, Pool 4.657, davon 4.000 `vis` (3.149 aus Serie BKT/Serie C, 851 Vereine ohne Liga oder vereinslos, 585 vereinslos). Wechselchance in `vis`: 20er 236, 30er 441, 40er 580, 50er 320, 60er 192, 70er 1.099, 80er 385, 90er 580 (unter 20: 167). Serie BKT 1.056 in `vis`, `weaker_league` bei 165 Pool-Spielern.
 
+19. **Teil 3 (15.11.): Reiter Taktik.** Branch `teil-3-taktik`, vier Tasks.
+    - `cotrainer/ui/taktik.js` (globales `TAKTIK`, reine Logik, Node-Tests in `tests/js/`): acht Bereiche, die den Trainingseinheiten entsprechen (Formation mit/ohne Ball, Passstil, Spielaufbau, Chancen kreieren, Pressinglinie, Pressingintensität, Pressingfalle).
+    - **Rechenregel:** Je Spieler auf den Positionen des Bereichs in der Startelf der gewichtete Mittelwert der Bereichsattribute (Schlüsselattribute der gespielten Rolle zählen doppelt), je Bereich der Mittelwert über diese Spieler (nur intern, keine Zahl in der Oberfläche). Stufen: ab 13 „gut“, ab 11 „mittel“, darunter „schwach“; ohne passende Spieler keine Stufe. Verursacher = bis zu drei Spieler unter 11, schwächster zuerst; dazu Abhilfe (bessere Rolle, Training, Transfer).
+    - Trainerbewertungen als Textstufen; der Führungsstil (Training/Mental) wird pro Karriere gewählt und im `localStorage` gespeichert.
+    - **Verknüpfung:** Schwache Bereiche werden im Training vorgezogen (Pille „Schwachstelle“, Text unter der Überschrift). Im Transferbereich gibt es den Filter „Nur Positionen mit Taktik-Schwachstellen“ (`S.f.weak`, Plätze der Verursacher, geschnitten mit dem Positionsfilter); in Stufe „Aus“ zusätzlich der Grund „Spielt <Position> – dort liegt die Schwachstelle „<Bereich>““. Beides nutzt nur Positionen, nichts aus CA/PA/Attributen fremder Spieler.
+    - Prüfung im Browser mit künstlich geschwächter Startelf (nur im Speicher): Passstil, Spielaufbau, Pressinglinie, Pressingfalle schwach, Pille und Filter wirken (Aus: 3769 → 1940 Spieler, gleiche Reihenfolge), Meldung bei Filter ohne Schnittmenge.
+    - Mit den Grenzen 13/11 hat Ravenna in den echten Daten keinen schwachen Bereich (alle acht „mittel“).
+
 ## Erkenntnisse zum Spielstand-Format
 
 ### Container
@@ -186,7 +194,10 @@ FM speichert Geld in **GBP**. Für die Anzeige gilt: **EUR = GBP × 1,1641** (ex
 
 ### Taktik (`tactics_man`)
 
-Kopf einer eigenen Taktik: `22 44 00 1b 00 00 00 <flag> <len u32> Name`.
+Kopf einer eigenen Taktik: `22 44 00 1b 00 <?> 00 <Art> <len u32> Name`.
+
+- Das Byte `<?>` ist meist 00, in mehreren Ravenna-Spielständen aber 01 (vert tiki taka, angrenzende Ligen, kein Scouting, liga, südeuropa). Bis Commit e5a68f9 fielen diese Spielstände auf die Standardformation zurück; jetzt werden alle drei Taktiken erkannt. Der Stilcode `TREV` = „Vertikales Tiki-Taka“ ist durch den Spielstand „Ravenna vert tiki taka“ bestätigt.
+- `<Art>` ist das Flag:
 
 - Flag `02`: aktive Taktik
 - Flag `00`: weitere eigene Taktik
@@ -364,7 +375,7 @@ Stand 14.11.: **Teil 1 ist gebaut** (acht Tasks des Plans, Branch `programm-entw
    - Die Wahl aus Schritt 3 überschreibt bei jedem Start die gemerkten sichtbaren Bereiche (so im Plan; ggf. die letzte Wahl vorbelegen).
 5. **Danach je einen Plan schreiben und bauen** (Skill `superpowers:writing-plans`, dann `superpowers:executing-plans`):
    - ~~Teil 2~~ gebaut (fmsave als Datenquelle, Kader nur erste Mannschaft, Nationalität, Scoutinggebiet als Filter, drei Informationsstufen; Punkte 17 und 18), bis auf die Bestätigungen unter Punkt 7.
-   - Teil 3: neuer Taktik-Reiter (Schwachstellen, Verursacher, Abhilfe), Trainerbewertungen als Textstufen, Auswahl der Trainertendenzen pro Karriere, Trainingsfokus.
+   - ~~Teil 3: neuer Taktik-Reiter~~ gebaut am 15.11. (Punkt 19)
    - Teil 4: README, Lizenzhinweise, GitHub-Release.
    - Für den Plan von Teil 2 geklärt (Punkt 16): fmsave löst weder Nationaltrainer noch zwei Manager; die Meldung `require_squad` und der eigene Leser als Rückfall bleiben. Gepackt wird fmsave über `build.ps1` (siehe Punkt 17).
 6. **Für Teil 2 noch zu dekodieren:**
@@ -377,7 +388,10 @@ Stand 14.11.: **Teil 1 ist gebaut** (acht Tasks des Plans, Branch `programm-entw
    - ~~neuer Screenshot der Osijek-Finanzen~~ (15.11., stimmt);
    - Angrenzende Ligen bei Osijek laut Spiel: „HNL und 1. NL“ (eigene Liga plus eine darunter, darüber gibt es keine). Passt zur Regel „Stufe ± 1“; ob das Programm genau diese beiden Ligen wählt, ist mit Osijek noch nicht geprüft;
    - ~~der Schalter „Auch außerhalb meines Scoutinggebiets suchen“~~ gebaut am 15.11. (siehe „Getroffene Entscheidungen“).
-   - Stil-Code `TREV` = Vertikales Tiki-Taka;
+   - ~~Stil-Code `TREV` = Vertikales Tiki-Taka~~ bestätigt durch den Spielstand „Ravenna vert tiki taka“ (15.11.);
+   - Taktik: Zuordnung Karte → Tendenz bei den Karten mit `sure:false` prüfen;
+   - Taktik: ob der gewählte Führungsstil im Spielstand steht (dann könnte Co-Trainer ihn lesen);
+   - Taktik: Einschätzung der Bereiche mit dem Bildschirm „Taktische Effektivität“ im Spiel vergleichen. Mit den Grenzen 13/11 hat Ravenna keinen schwachen Bereich (alle „mittel“); der Nutzer soll beurteilen, ob das zum Spiel passt oder die Grenzen geändert werden müssen;
    - Stufengrenzen der Trainerbewertungen unterhalb von 18 (bisher nur aus Profil-Screenshots abgeleitet);
    - ob der Name „Co-Trainer“ frei ist (nicht geprüft).
 
