@@ -347,7 +347,7 @@ Grundlage: `Trainertest 2.fm` (unverändert) gegen `Trainertest 2 traainer.fm` (
 - **Fehlende Spieler:** Beim eigenen Leser (Rückfall) fehlen einzelne Spieler, z. B. Otávio und Ikoné bei Paris, und Leihspieler werden nicht immer erkannt. Mit fmsave als Quelle ist das gelöst.
 - **Einlesen dauert rund zwei Minuten:** Beide Leser (fmsave und der eigene) entpacken den Spielstand je einmal.
 - **Nicht ausgelesen werden:** Scoutingbudget, Staffattribute anderer Trainer, Teamanweisungen (fmsave liest Scoutingbudget und Staffattribute). Die Ligastufe wird nur aus der Vereinsreputation abgeleitet.
-- **Trainertendenzen:** Die 15 Neigungen des eigenen Managers werden gelesen, stehen aber überall auf 10. Woher das Spiel die angezeigten Tendenzen nimmt, ist offen; im Programm werden sie pro Karriere ausgewählt.
+- **Trainertendenzen:** Die 15 Neigungen des eigenen Managers werden gelesen, stehen aber überall auf 10. Im Spiel ergeben sich die Tendenzen aus dem Führungsstil („Ihr Stil“: 3 Trainings-, 2 Mentalkarten); Co-Trainer lässt diese Karten pro Karriere auswählen (Teil 3). Ob die Wahl im Spielstand steht, ist offen.
 - **Zielstrebigkeit und Streitlust des Managers ändern sich zwischen Spielständen ohne Zutun** (z. B. Paris: 14 → 10); Ursache unbekannt.
 - **Torwartwahl:** Durch die Gewichtung „Ballspielender Torwart“ wählt das Programm bei Paris Nkambadio statt Trapp.
 - **Spielstandwahl:** Backups sind ausgeschlossen, aber `find_save` nimmt weiterhin den neuesten Spielstand *jeder* Karriere (keine Einschränkung auf einen Manager).
@@ -358,9 +358,22 @@ Grundlage: `Trainertest 2.fm` (unverändert) gegen `Trainertest 2 traainer.fm` (
 
 ## Nächste Schritte
 
+### Als Nächstes (Stand 15.11. abends, `main` = Teile 1–3 + aktive Taktik, `dist\Co-Trainer.exe` vom 15.11. 17:58, 133 Tests grün)
+
+1. **GitHub einrichten (begonnen, wartet auf den Nutzer).** Laut Nutzer gibt es schon ein Repository; die Adresse fehlt noch, im Projekt ist kein Remote eingetragen.
+   - `gh` ist installiert (`C:\Program Files\GitHub CLI\gh.exe`, in der laufenden Sitzung noch nicht im PATH), aber nicht angemeldet: `gh auth login` (Browser, HTTPS).
+   - Der GitHub-MCP-Server (Plugin) scheitert mit „HTTP 400 … Authorization header is badly formatted“, weil `GITHUB_PERSONAL_ACCESS_TOKEN` nicht gesetzt ist (`.mcp.json` schickt `Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}`). Abhilfe: nach `gh auth login` `setx GITHUB_PERSONAL_ACCESS_TOKEN (gh auth token)`, dann Claude Code neu starten. Für `git push` ist der MCP-Server nicht nötig.
+   - Vor dem ersten Push entscheiden: privat oder öffentlich (Empfehlung: erst privat); ob die Autor-E-Mail in den Commits durch die GitHub-noreply-Adresse ersetzt wird (geht nur vor dem ersten Push sauber); Nutzername und Pfade `%USERPROFILE%\…` stehen in `CLAUDE.md`, `HANDOFF.md`, Spec, Plänen und `tests/conftest.py`; `config.json` (Karrieredaten, Entwicklerhilfe) ist eingecheckt.
+   - Alles liegt in `main`; ein Pull Request entsteht erst mit dem nächsten Branch (Teil 4).
+2. **Teil 4 planen und bauen:** README (Start, Windows-Schutzhinweis wegen fehlender Signatur, WebView2), Lizenzhinweise (MIT für Co-Trainer und fmsave), persönliche Daten aus dem Repo nehmen (siehe 1), GitHub-Release mit `Co-Trainer.exe`.
+3. **Rollentest (B.1)** hat Vorrang bei der Dekodierung: bei Osijek sind 17 von 22 Rollen unbekannt, bei „Ravenna 2 spieltaktik“ (5-2-3) 20.
+4. **Vom Nutzer zu bestätigen:** siehe A.7 (offen: Konter-/Ballbesitz-Annäherungen der Stil-Codes, Karte → Tendenz bei `sure:false`, Bereiche und Baustellen-Grenze 0,3 gegen „Taktische Effektivität“, ob in „2 spieltaktik“ die 5-2-3-Taktik die Spieltaktik ist, Stufengrenzen der Trainerbewertungen, Name „Co-Trainer“).
+5. **Zurückgestellte Kleinigkeiten aus Teil 3** (bei Gelegenheit): Testlücken (Randfälle von `helpFor`/`leadHints`, Sortierung der Trainingseinheiten, Taktik-Plätze 2/3, Nummerierung bei übersprungenem Taktikkopf); `areas(an)` und `analyze()` werden pro Darstellung mehrfach gerechnet; Pressing-Baustellen werden auch bei Konterstilen im Training vorgezogen; bei leerem `coaching` erscheint trotzdem die Mental-Tabelle; ein Taktikindex, der auf einen nicht lesbaren Kopf zeigt, fällt ohne Hinweis auf Platz 1 zurück; Feld `active` in `read_tactics` ist ungenutzt.
+6. **Mögliche Verbesserungen:** Wechselchance für frisch gewechselte Spieler (`club_join_date` unklar), Ligen ohne Namen („Wettbewerb 6026“), „Kein Scouting“ (welche Spieler den Mitarbeitern bekannt sind), Zwischenspeicher fürs Einlesen.
+
 ### A. Umbau zum Programm „Co-Trainer“ (Vorrang)
 
-Stand 14.11.: **Teil 1 ist gebaut** (acht Tasks des Plans, Branch `programm-entwurf`), siehe „Was bisher gemacht wurde“ Punkt 15.
+Stand 15.11.: **Teile 1, 2, 2b und 3 sind gebaut und in `main`**, siehe „Was bisher gemacht wurde“ Punkte 15–19.
 
 1. ~~Nutzer probiert `dist\Co-Trainer.exe` aus~~: Probelauf aus der `.exe` siehe Punkt 17, zuletzt am 15.11. mit Teil 2b neu gebaut und gestartet. Ursprüngliche Prüfliste:
    - erster Start zeigt Schritt 1 mit dem vorgeschlagenen Ordner (die echten Einstellungen in `%APPDATA%\Co-Trainer` sind noch nicht angelegt);
@@ -397,7 +410,8 @@ Stand 14.11.: **Teil 1 ist gebaut** (acht Tasks des Plans, Branch `programm-entw
    - ~~Stil-Code `TREV` = Vertikales Tiki-Taka~~ bestätigt durch den Spielstand „Ravenna vert tiki taka“ (15.11.);
    - Taktik: Zuordnung Karte → Tendenz bei den Karten mit `sure:false` prüfen;
    - Taktik: ob der gewählte Führungsstil im Spielstand steht (dann könnte Co-Trainer ihn lesen);
-   - Taktik: Einschätzung der Bereiche mit dem Bildschirm „Taktische Effektivität“ im Spiel vergleichen. Mit den Grenzen 13/11 hat Ravenna keinen schwachen Bereich (alle „mittel“); der Nutzer soll beurteilen, ob das zum Spiel passt oder die Grenzen geändert werden müssen;
+   - Taktik: Einschätzung der Bereiche mit dem Bildschirm „Taktische Effektivität“ im Spiel vergleichen. Mit den Grenzen 13/11 hat Ravenna keinen schwachen Bereich (alle „mittel“, 11,4–12,2); seit der Korrekturrunde zählen deshalb auch „Baustellen“ (Spieler unter 11, mindestens 0,3 unter dem Schnitt): bei Ravenna Passstil und Spielaufbau. Der Nutzer soll beurteilen, ob das zum Spiel passt oder Grenzen und 0,3 geändert werden müssen;
+   - Taktik: ob in „Ravenna 2 spieltaktik“ die Taktik „5-2-3 DM Breit (Kontrolliert) – Ballbesitzspiel“ die Spieltaktik ist (so liest es Co-Trainer);
    - Stufengrenzen der Trainerbewertungen unterhalb von 18 (bisher nur aus Profil-Screenshots abgeleitet);
    - ob der Name „Co-Trainer“ frei ist (nicht geprüft).
 
