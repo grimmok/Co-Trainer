@@ -60,12 +60,16 @@ def nation_geo(game_db):
         log(f'Nationentabelle: {len(starts)} ablaufbare Tabellen statt einer')
         return {}
     geo, pos, n = {}, starts[0], len(game_db)
-    for _ in range(scan.row_count):
-        end = _closing_header_at(game_db, pos, scan, n)
-        g = _step_start(game_db, pos, scan, _GEO_STEP)
-        _row, db_id, _third = _HEADER.unpack_from(game_db, end)
-        geo[db_id] = (game_db[g + 1], _U32.unpack_from(game_db, g + 5)[0])
-        pos = end + _HEADER.size
+    try:
+        for _ in range(scan.row_count):
+            end = _closing_header_at(game_db, pos, scan, n)
+            g = _step_start(game_db, pos, scan, _GEO_STEP)
+            _row, db_id, _third = _HEADER.unpack_from(game_db, end)
+            geo[db_id] = (game_db[g + 1], _U32.unpack_from(game_db, g + 5)[0])
+            pos = end + _HEADER.size
+    except (struct.error, IndexError) as e:
+        log('Nationentabelle: Zeile nicht lesbar:', e)
+        return {}
     return geo
 
 
@@ -110,11 +114,12 @@ def nation_names(lang_path):
         log('Ländernamen: lang_db.dat nicht lesbar:', e)
         return {}
     dz = zstandard.ZstdDecompressor()
+    view = memoryview(data)             # kein Kopieren des Puffers je Frame
     pos = data.find(MAGIC)
     while pos != -1:
         obj = dz.decompressobj()
         try:
-            raw = obj.decompress(data[pos:])
+            raw = obj.decompress(view[pos:])
         except zstandard.ZstdError:
             pos = data.find(MAGIC, pos + 4)
             continue

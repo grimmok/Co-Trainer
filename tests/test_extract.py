@@ -244,6 +244,18 @@ def test_weaker_league_compares_groups():
     assert X.weaker_league(g, None, 3) is False      # eigene Liga unbekannt
 
 
+def test_weaker_league_for_club_without_league():
+    clubs = {1: dict(nat=776, rep=4500), 2: dict(nat=776, rep=4300)}
+    g = X.league_groups({1: dict(name='Serie C/B', teams=[1, 2])}, clubs)      # Gruppenmittel 4400
+    assert X.weaker_league(g, 1, None, dict(nat=776, rep=3500)) is True        # Serie-D-Verein: 3500 < 4180
+    assert X.weaker_league(g, 1, None, dict(nat=776, rep=4300)) is False       # 98 % des Mittels
+    assert X.weaker_league(g, 1, None, dict(nat=769, rep=1000)) is False       # anderes Land
+    assert X.weaker_league(g, 1, None, dict(nat=776, rep=0)) is False          # ohne Reputation
+    assert X.weaker_league(g, 1, None, dict(nat=776)) is False
+    assert X.weaker_league(g, 1, None, {}) is False
+    assert X.weaker_league(g, None, None, dict(nat=776, rep=1000)) is False    # eigene Liga unbekannt
+
+
 def test_scout_context_needs_own_league_for_league_areas():
     tiers = {22: (776, 1), 23: (776, 2), 24: (776, 3), 30: (769, 1)}
     comps = {22: dict(teams=[1]), 23: dict(teams=[2]), 24: dict(teams=[3]), 30: dict(teams=[4])}
@@ -276,36 +288,101 @@ def test_willingness_uses_club_reputation():
 def test_vis_selection_ignores_ca_and_pa():
     import random
     rnd = random.Random(7)
-    area = [dict(id=i, club=i % 30, ca=rnd.randint(40, 160), pa=rnd.randint(60, 190)) for i in range(400)]
+    area = [dict(id=i, club=i % 30, nat=776 if i % 3 else 769, age=16 + i % 20, ca=rnd.randint(40, 160),
+                 pa=rnd.randint(60, 190), attrs=[rnd.randint(1, 100) for _ in range(54)]) for i in range(400)]
     will = {pl['id']: rnd.randint(2, 97) for pl in area}
     con = {pl['id']: dict(end=None if pl['id'] % 9 == 0 else f'202{pl["id"] % 5 + 6}-06-30') for pl in area}
     rep = {c: rnd.randint(0, 5000) for c in range(1, 30)}
+    club_map = {c: dict(nat=776 if c % 4 else 769, rep=rep[c]) for c in range(1, 30)}
+    league_of = {c: 100 + c % 6 for c in range(1, 30) if c % 5}
+    near = {101, 102, 103}
+
+    def rel(pl):
+        return X.pool_relevance(pl, club_map, 776, near, league_of)
 
     def run():
         out = X.select_pool(area, will, con, rep, lambda pl: 80 <= pl['ca'] <= 130, lambda pl: -pl['ca'],
-                            vis_n=100, quality_n=80)
+                            relevance=rel, my_rep=2500, vis_ok=lambda pl: pl['club'] != 0 or pl['age'] >= 18,
+                            vis_n=250, quality_n=80)
         return [pl['id'] for pl, v in out if v], [pl['id'] for pl, v in out if not v]
     vis1, qual1 = run()
     cas, pas = [pl['ca'] for pl in area], [pl['pa'] for pl in area]
     rnd.shuffle(cas); rnd.shuffle(pas)
     for pl, ca, pa in zip(area, cas, pas):
         pl['ca'], pl['pa'] = ca, pa
+        rnd.shuffle(pl['attrs'])
     vis2, qual2 = run()
-    assert len(vis1) == 100 and vis1 == vis2                      # Auswahl und Reihenfolge gleich
+    assert len(vis1) == 250 and vis1 == vis2                      # Auswahl und Reihenfolge gleich
     assert qual1 != qual2 and not set(vis1) & set(qual1)          # Qualitätsteil darf sich ändern, keine Doppelten
-    bands = [will[i] // 10 for i in vis1]
-    assert bands == sorted(bands, reverse=True)
+    byid = {pl['id']: pl for pl in area}
+    keys = [(rel(byid[i]), -(will[i] // 10)) for i in vis1]
+    assert keys == sorted(keys)                                   # Nähe, dann Wechselchance-Stufe
+    assert len({k[0] for k in keys}) > 1
 
 
-def test_vis_order_within_band_by_club_reputation():
-    area = [dict(id=1, club=5), dict(id=2, club=6), dict(id=3, club=0), dict(id=4, club=6), dict(id=5, club=7)]
-    will = {1: 91, 2: 95, 3: 97, 4: 95, 5: 80}
+def test_vis_order_within_band_by_reputation_gap():
+    area = [dict(id=1, club=5), dict(id=2, club=6), dict(id=3, club=0), dict(id=4, club=6), dict(id=5, club=7),
+            dict(id=6, club=8)]
+    will = {1: 91, 2: 95, 3: 97, 4: 95, 5: 80, 6: 93}
     con = {1: dict(end='2027-06-30'), 2: dict(end='2028-06-30'), 4: dict(end='2026-12-31'), 5: dict(end=None)}
-    rep = {5: 3000, 6: 4500, 7: 9000}
-    out = X.select_pool(area, will, con, rep, lambda pl: False, lambda pl: 0)
-    # Stufe 90er: Verein 6 (4500) vor Verein 5 (3000) vor vereinslos (keine Reputation); bei gleichem Verein
-    # entscheidet das Vertragsende; Stufe 80er (trotz Reputation 9000) zuletzt
-    assert [pl['id'] for pl, v in out] == [4, 2, 1, 3, 5] and all(v for _, v in out)
+    rep = {5: 3000, 6: 4500, 7: 4300, 8: 5300}
+    out = X.select_pool(area, will, con, rep, lambda pl: False, lambda pl: 0, my_rep=4300)
+    # Stufe 90er: Verein 6 (Abstand 200) vor Verein 8 (1000) vor Verein 5 (1300) vor vereinslos (ohne Reputation);
+    # bei gleichem Verein entscheidet das Vertragsende; Stufe 80er (trotz Abstand 0) zuletzt
+    assert [pl['id'] for pl, v in out] == [4, 2, 6, 1, 3, 5] and all(v for _, v in out)
+
+
+def test_vis_relevance_before_willingness_band():
+    # Serie-B-Verein (Liga Stufe ± 1) vor Verein ohne Liga und vor fremdem Land, alle in derselben Wechselchance-Stufe
+    club_map = {1: dict(nat=776, rep=4300), 10: dict(nat=776, rep=5200), 11: dict(nat=776, rep=4300),
+                12: dict(nat=769, rep=4300), 13: dict(nat=776, rep=7000)}
+    league_of = {1: 103, 10: 102, 13: 101}            # 11 und 12 ohne spielbare Liga
+    near = {102, 103, 104}
+    area = [dict(id=1, club=11, nat=776), dict(id=2, club=10, nat=776), dict(id=3, club=12, nat=776),
+            dict(id=4, club=0, nat=776), dict(id=5, club=0, nat=769), dict(id=6, club=13, nat=776),
+            dict(id=7, club=10, nat=776)]
+    will = {1: 75, 2: 72, 3: 79, 4: 97, 5: 97, 6: 70, 7: 55}
+    rep = {c: v['rep'] for c, v in club_map.items()}
+
+    def rel(pl):
+        return X.pool_relevance(pl, club_map, 776, near, league_of)
+    assert [rel(pl) for pl in area] == [1, 0, 2, 1, 2, 2, 0]
+    out = X.select_pool(area, will, {}, rep, lambda pl: False, lambda pl: 0, relevance=rel, my_rep=4300)
+    order = [pl['id'] for pl, _ in out]
+    assert order.index(2) < order.index(1)            # Serie B vor Verein ohne Liga, gleiche Stufe 70er
+    assert order == [2, 7, 4, 1, 5, 3, 6]
+    # vis_ok schließt aus (z. B. Vereinslose unter 18)
+    out = X.select_pool(area, will, {}, rep, lambda pl: False, lambda pl: 0, relevance=rel, my_rep=4300,
+                        vis_ok=lambda pl: pl['club'] != 0)
+    assert 4 not in [pl['id'] for pl, _ in out] and 5 not in [pl['id'] for pl, _ in out]
+
+
+def test_own_reader_willingness_ignores_ca():
+    # Eigener Leser: kein Vereinsabstand aus Stärke; CA/PA/Attribute ändern die Wechselchance nicht
+    base = dict(id=1, club=5, pers=[10, 15, 12] + [10] * 5)
+    cm = {5: dict(), 1: dict()}
+    outs = set()
+    for ca in (40, 90, 150, 199):
+        pl = dict(base, ca=ca, pa=ca + 10, attrs=[ca % 100] * 54)
+        outs.add(X.player_willingness(pl, 1, cm, False, 2.0, 26))
+    assert len(outs) == 1
+    assert X.club_diff(5, 1, cm, False) == 0 and X.club_diff(0, 1, cm, False) == X.FREE_AGENT_DIFF
+    assert X.player_willingness(dict(base, club=1), 1, cm, False, 2.0, 26) is None
+
+
+def test_rep_diff_cap_for_small_clubs():
+    cm = {1: dict(rep=4300), 2: dict(rep=1000), 3: dict(rep=4100)}
+    assert X.club_diff(2, 1, cm, True) == X.REP_DIFF_MIN == -4
+    assert X.club_diff(3, 1, cm, True) == -4
+    assert X.club_diff(0, 1, cm, True) == X.FREE_AGENT_DIFF
+
+
+def test_has_lower_tier():
+    tiers = {22: (776, 1), 23: (776, 2), 24: (776, 3), 30: (769, 1)}
+    assert X.has_lower_tier(tiers, 23) is True
+    assert X.has_lower_tier(tiers, 24) is False
+    assert X.has_lower_tier(tiers, 30) is False
+    assert X.has_lower_tier(tiers, None) is False
 
 
 @pytest.mark.save
@@ -314,6 +391,9 @@ def test_ravenna_scout_area(ravenna_data):
     assert m['scout_filter'] == m['scout_area'] and m['nat'] == 'ITA'
     pool = ravenna_data['pool']
     assert pool and all(p['nat'] != '–' for p in pool[:200])
-    assert any(p['vis'] for p in pool) and sum(p['vis'] for p in pool) <= 3000
-    assert len(pool) <= 7000
-    assert all(isinstance(p['weaker_league'], bool) for p in pool)
+    assert any(p['vis'] for p in pool) and sum(p['vis'] for p in pool) <= X.VIS_POOL
+    assert len(pool) <= 8000
+    assert all(isinstance(p['weaker_league'], bool) and isinstance(p['near_league'], bool) for p in pool)
+    vis = [p for p in pool if p['vis']]
+    assert any(p['lg'] == 'Serie BKT' for p in vis) and any(p['weaker_league'] for p in vis)
+    assert not any(not p['club'] and p['age'] < 18 for p in vis)

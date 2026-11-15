@@ -119,10 +119,13 @@ Nutzerdaten:
     - `cotrainer/nations.py`: Kontinent und Region je Land aus der Nationentabelle; alle 251 Länder mit deutschem Namen (502 Namen gelesen). Die alte Regex hörte bei 195 auf, weil das Byte nach einem Namen ein Grammatik-Flag 0–4 ist und manche Einträge kein Kürzel haben.
     - fmsave liefert jetzt Nationalität der Spieler sowie Land und Reputation der Vereine. Der fmsave-Verein mit uid 0 (KS Besa) wird intern zu `2**31`, weil 0 „vereinslos“ heißt.
     - Ligastufe aus der mittleren Vereinsreputation; Staffeln über `league_base` zusammengefasst (Ravenna: Serie A 1, Serie BKT 2, Serie C 3; Serie D hat keine Spiele im Spielstand).
-    - Pool nach Scoutinggebiet. Sichtbare Auswahl `vis` (3.000, ohne CA/PA; Reihenfolge: Wechselchance-Band, Vereinsreputation, vereinslos, Vertragsende) plus Qualitätsauswahl (4.000).
-    - Wechselchance aus der Vereinsreputation statt der Vereinsstärke (fmsave-Weg); der Abstand nach unten ist auf −10 begrenzt.
+    - Pool nach Scoutinggebiet. Sichtbare Auswahl `vis` (4.000, ohne CA/PA/Attribute; Reihenfolge: Nähe – Liga des eigenen Landes mit Stufe ± 1 zuerst, dann Vereine des eigenen Landes ohne spielbare Liga und vereinslose Landsleute, dann der Rest –, Wechselchance-Band, Abstand zur eigenen Vereinsreputation, vereinslos, Vertragsende; vereinslose Spieler unter 18 nicht in `vis`) plus Qualitätsauswahl (4.000). Feld `near_league` = Liga mit Stufe ± 1 im eigenen Land.
+    - Wechselchance aus der Vereinsreputation statt der Vereinsstärke (fmsave-Weg): Grundwert 68 (`WILL_BASE`), der Abstand nach unten ist auf −4 begrenzt (`REP_DIFF_MIN`), Vereinslose −10. Der eigene Leser nutzt keinen Vereinsabstand mehr (0, Vereinslose −10), weil die Vereinsstärke aus CA käme.
+    - `weaker_league` auch für Vereine ohne spielbare Liga im eigenen Land: Vereinsreputation unter 95 % des Mittels der eigenen Liga.
+    - Stufe „Aus“, Empfehlung: vereinslos +8, Liga deines Niveaus (`near_league`) +10 mit Grund „Spielt in einer Liga deines Niveaus“. Fußnote zur Wechselchance je nach Quelle (fmsave / eigener Leser).
+    - Scoutinggebiet 3 ohne tiefere spielbare Liga: Hinweis in `meta.scout_note`; die Oberfläche zeigt Gebiet und Hinweis zusammen.
     - Drei Informationsstufen in der Oberfläche (Aus, Scoutbericht, Werte) mit Hinweis vor dem Hochschalten; gespeichert in `settings.json`.
-    - **Ravenna:** Scoutinggebiet 4 (Eigenes Land), 6.953 Spieler im Gebiet, Pool 4.616, davon 3.000 `vis`.
+    - **Ravenna:** Scoutinggebiet 4 (Eigenes Land), 6.953 Spieler im Gebiet, Pool 4.657, davon 4.000 `vis` (3.149 aus Serie BKT/Serie C, 851 Vereine ohne Liga oder vereinslos, 585 vereinslos). Wechselchance in `vis`: 20er 236, 30er 441, 40er 580, 50er 320, 60er 192, 70er 1.099, 80er 385, 90er 580 (unter 20: 167). Serie BKT 1.056 in `vis`, `weaker_league` bei 165 Pool-Spielern.
 
 ## Erkenntnisse zum Spielstand-Format
 
@@ -331,7 +334,7 @@ Grundlage: `Trainertest 2.fm` (unverändert) gegen `Trainertest 2 traainer.fm` (
 - **Torwartwahl:** Durch die Gewichtung „Ballspielender Torwart“ wählt das Programm bei Paris Nkambadio statt Trapp.
 - **Spielstandwahl:** Backups sind ausgeschlossen, aber `find_save` nimmt weiterhin den neuesten Spielstand *jeder* Karriere (keine Einschränkung auf einen Manager).
 - **Ungeprüfte Werte:** Das garantierte Mindestbudget für die nächste Saison ist nicht mit dem Spiel abgeglichen. Die Wechselchance ist eine Annahme (seit Teil 2b aus der Vereinsreputation).
-- **Stufe „Aus“ voller Spieler ohne spielbare Liga:** Von den 3.000 `vis`-Spielern bei Ravenna haben rund 2.000 keine spielbare Liga (vereinslos oder Serie-D-Vereine), die meisten mit Wechselchance in den 90ern. Sie dominieren die Liste.
+- **Stufe „Aus“, Empfehlung zu einförmig:** Bei Ravenna stehen in den ersten 80 (ohne Positionsfilter) nur Serie-C-Spieler (C/C 35, C/A 24, C/B 21), keine Vereinslosen, kein Serie-BKT- oder Serie-D-Spieler. Grund: +40 für die schwächste Position (LA) und +15 für auslaufende Verträge entscheiden; der beste Serie-BKT-Spieler steht auf Platz 82, der beste ohne Liga auf 115, der beste Vereinslose auf 124. Die Gewichtung der Empfehlung ist mit dem Nutzer abzustimmen.
 - **Osijek-Kontostand:** Der Test prüft nur noch „> 0“, weil der Nutzer den Spielstand neu gespeichert hat. Der Screenshot-Wert vom 14.11. war 6.713.387 €.
 
 ## Nächste Schritte

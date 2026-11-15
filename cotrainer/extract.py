@@ -744,9 +744,13 @@ def league_tiers(league_list, club_map):
 WEAKER_LEAGUE = 0.95        # schwächere Liga: Gruppenreputation unter 95 % der eigenen
 
 
-def weaker_league(groups, my_lid, lid):
-    """Spielt die Liga lid in einer klar schwächeren Gruppe als die eigene? Gleiche Gruppe oder unbekannt: False."""
+def weaker_league(groups, my_lid, lid, club=None):
+    """Spielt die Liga lid in einer klar schwächeren Gruppe als die eigene? Gleiche Gruppe oder unbekannt: False.
+    Verein ohne spielbare Liga (z. B. Serie D): aus dem eigenen Land mit Reputation → Vereinsreputation gegen das
+    Gruppenmittel der eigenen Liga."""
     mine, his = groups.get(my_lid), groups.get(lid)
+    if lid is None and mine and mine[2] and club and club.get('nat') == mine[0] and club.get('rep'):
+        return club['rep'] < WEAKER_LEAGUE * mine[2]
     if not mine or not his or mine[:2] == his[:2] or not mine[2] or not his[2]:
         return False
     return his[2] < WEAKER_LEAGUE * mine[2]
@@ -791,12 +795,13 @@ def in_scout_area(pl, ctx):
 
 SCOUT_NOTE_MISSING = 'Scoutinggebiet nicht gefunden – Vorschläge aus allen Ländern.'
 SCOUT_NOTE_NO_FMS = 'Ohne fmsave kann das Scoutinggebiet nicht angewendet werden – Vorschläge aus allen Ländern.'
-VIS_POOL, QUALITY_POOL = 3000, 4000
+VIS_POOL, QUALITY_POOL = 4000, 4000
 
 
 REP_PER_POINT = 50          # Reputationsabstand → Skala des früheren Stärkeabstands (Serie A ↔ Serie C ≈ 56)
 FREE_AGENT_DIFF = -10       # Vereinslose wollen eher wechseln
-REP_DIFF_MIN = -10          # viel kleinere Vereine zählen nicht stärker als Vereinslose
+REP_DIFF_MIN = -4           # viel kleinere Vereine: Deckel, sonst landet fast jeder in den 90ern
+WILL_BASE = 68              # Wechselchance bei gleich großem Verein, 2 Jahren Vertrag, neutraler Persönlichkeit
 
 
 def club_rep_diff(club, my_id, club_map):
@@ -810,9 +815,43 @@ def club_rep_diff(club, my_id, club_map):
     return (his - mine) / REP_PER_POINT
 
 
+def club_diff(club, my_id, club_map, from_fms):
+    """Vereinsabstand für die Wechselchance, nie aus Stärke (CA) fremder Spieler oder Vereine.
+    fmsave: Reputationsabstand, kleine Vereine bei REP_DIFF_MIN gedeckelt; vereinslos FREE_AGENT_DIFF.
+    Eigener Leser (keine Reputation): 0, vereinslos FREE_AGENT_DIFF."""
+    if club == 0:
+        return FREE_AGENT_DIFF
+    if not from_fms:
+        return 0
+    return max(club_rep_diff(club, my_id, club_map), REP_DIFF_MIN)
+
+
+def player_willingness(pl, my_id, club_map, from_fms, years_left, age):
+    """Wechselchance eines fremden Spielers (None für eigene); nutzt keine Spielerqualität."""
+    if pl['club'] == my_id:
+        return None
+    return willingness_score(club_diff(pl['club'], my_id, club_map, from_fms), pl['club'] == 0, pl['pers'],
+                             years_left, age)
+
+
+def pool_relevance(pl, club_map, my_nat, near_lids, league_of):
+    """Wie nah liegt der Spieler am eigenen Umfeld? 0: Liga des eigenen Landes mit Stufe ± 1 (angrenzende Ligen);
+    1: Verein des eigenen Landes ohne spielbare Liga oder vereinslos mit eigener Nationalität; 2: alles andere.
+    Nur sichtbare Merkmale (Verein, Liga, Land)."""
+    club = pl['club']
+    if club == 0:
+        return 1 if my_nat is not None and pl.get('nat') == my_nat else 2
+    lid = league_of.get(club)
+    if lid is not None and lid in near_lids:
+        return 0
+    if lid is None and my_nat is not None and club_map.get(club, {}).get('nat') == my_nat:
+        return 1
+    return 2
+
+
 def willingness_score(diff, free, pers, years_left, age):
     """0-100: Wechselchance aus Vereinsabstand, Persönlichkeit (intern), Vertragsrest und Alter; keine Spielerqualität."""
-    score = 75 - diff * 1.6
+    score = WILL_BASE - diff * 1.6
     p = pers or [10] * 8
     # Reihenfolge: Anpassung, Ehrgeiz, Loyalität, Druck, Professionalität, Sportsgeist, Temperament, Kontroversität
     ambition, loyalty = p[1], p[2]
@@ -828,15 +867,20 @@ def willingness_score(diff, free, pers, years_left, age):
     return max(2, min(97, round(score)))
 
 
-def select_pool(area, will, con, rep, quality_ok, quality_key, vis_n=VIS_POOL, quality_n=QUALITY_POOL):
+def select_pool(area, will, con, rep, quality_ok, quality_key, relevance=None, my_rep=None, vis_ok=None,
+                vis_n=VIS_POOL, quality_n=QUALITY_POOL):
     """Pool aus zwei Auswahlen → [(Spieler, vis)]. Zuerst „vis“, nur nach sichtbaren Merkmalen (kein CA/PA, keine
-    Attribute): Wechselchance in Zehnerstufen absteigend, Vereinsreputation (rep: Vereins-ID → Reputation) absteigend,
+    Attribute), nur Spieler mit vis_ok: Nähe (relevance, 0 zuerst), Wechselchance in Zehnerstufen absteigend,
+    Abstand der Vereinsreputation (rep: Vereins-ID → Reputation) zur eigenen (my_rep) aufsteigend, unbekannt zuletzt,
     Vereinslose zuerst, Vertragsende aufsteigend (ohne Ende zuerst); die ersten vis_n. Danach die Qualitätsauswahl
     (quality_ok, sortiert nach quality_key, die ersten quality_n) ohne Doppelte."""
     def vis_key(pl):
         end = con.get(pl['id'], {}).get('end')
-        return (-(will[pl['id']] // 10), -(rep.get(pl['club']) or 0), pl['club'] != 0, end is not None, end or '')
-    vis_sel = sorted(area, key=vis_key)[:vis_n]
+        r = rep.get(pl['club'])
+        gap = abs(r - my_rep) if r and my_rep else float('inf')
+        return (relevance(pl) if relevance else 0, -(will[pl['id']] // 10), gap, pl['club'] != 0,
+                end is not None, end or '')
+    vis_sel = sorted((pl for pl in area if vis_ok is None or vis_ok(pl)), key=vis_key)[:vis_n]
     vis_ids = {pl['id'] for pl in vis_sel}
     qual = sorted((pl for pl in area if quality_ok(pl)), key=quality_key)[:quality_n]
     return [(pl, True) for pl in vis_sel] + [(pl, False) for pl in qual if pl['id'] not in vis_ids]
@@ -848,6 +892,18 @@ def adjacent_leagues(tiers, my_lid):
         return []
     my_land, my_tier = tiers[my_lid]
     return [lid for lid, (land, tier) in tiers.items() if land == my_land and abs(tier - my_tier) <= 1]
+
+
+SCOUT_NOTE_NO_LOWER = ('Tiefere Ligen sind in deinem Spielstand nicht spielbar und fehlen deshalb bei '
+                       '„Angrenzende Ligen“.')
+
+
+def has_lower_tier(tiers, my_lid):
+    """Gibt es im eigenen Land eine spielbare Liga unterhalb der eigenen? Ohne eigene Liga: False."""
+    if my_lid not in tiers:
+        return False
+    my_land, my_tier = tiers[my_lid]
+    return any(land == my_land and tier > my_tier for land, tier in tiers.values())
 
 
 def scout_context(scout_area, my_nat, my_lid, tiers, comps, geo, club_map):
@@ -987,7 +1043,7 @@ def _analyse(save, frames, names, cfg, progress):
 
     # Ligastufe, Länder und Scoutinggebiet: nur mit fmsave (der eigene Leser kennt kein Vereinsland)
     from . import nations       # erst hier: nations importiert dieses Modul
-    ctx, scout_note, nnames, groups = None, None, {}, {}
+    ctx, scout_note, nnames, groups, near_lids = None, None, {}, {}, set()
     my_nat = club_map.get(my_id, {}).get('nat')
     my_lid = league_of.get(my_id)
     if fd is not None:
@@ -995,10 +1051,13 @@ def _analyse(save, frames, names, cfg, progress):
         groups = league_groups(league_list, club_map)
         geo = nations.nation_geo(db.d)
         nnames = nations.nation_names(lang)
+        near_lids = set(adjacent_leagues(tiers, my_lid))
         log('Länder: Geodaten', len(geo), 'Namen', len(nnames))
         log('Eigene Ligastufe', tiers.get(my_lid, (None, None))[1], '| angrenzende Ligen:',
-            ', '.join(sorted(league_list[l]['name'] for l in adjacent_leagues(tiers, my_lid))))
+            ', '.join(sorted(league_list[l]['name'] for l in near_lids)))
         ctx, scout_note = scout_context(scout_area, my_nat, my_lid, tiers, comps, geo, club_map)
+        if ctx and ctx.area == 3 and not has_lower_tier(tiers, my_lid):
+            scout_note = (scout_note + ' ' if scout_note else '') + SCOUT_NOTE_NO_LOWER
     else:
         scout_note = SCOUT_NOTE_NO_FMS
     my_nat_code, my_nat_name = nations.nation_label(nnames, my_nat)
@@ -1029,15 +1088,8 @@ def _analyse(save, frames, names, cfg, progress):
 
     def willingness(pl):
         """0-100: wie wahrscheinlich ein Wechsel zu uns ist (Schätzung, nutzt Persönlichkeit nur intern).
-        Mit fmsave zählt die Vereinsreputation, nie die Stärke (CA) fremder Spieler oder Vereine."""
-        if pl['club'] == my_id:
-            return None
-        free = pl['club'] == 0
-        if fd is not None:
-            diff = max(club_rep_diff(pl['club'], my_id, club_map), REP_DIFF_MIN)   # kleine Vereine: gedeckelt
-        else:                                       # eigener Leser: keine Reputation, Vereinsstärke wie bisher
-            diff = club_str.get(pl['club'], 50 if free else my_str + 5) - my_str
-        return willingness_score(diff, free, pl['pers'], years_left(pl['id']), age_of(pl['dob']))
+        Mit fmsave zählt die Vereinsreputation; nie die Stärke (CA) fremder Spieler oder Vereine."""
+        return player_willingness(pl, my_id, club_map, fd is not None, years_left(pl['id']), age_of(pl['dob']))
 
     def rel_text(pl):
         """Relative Einordnung zum eigenen Kader als Text; die Zahl dahinter bleibt intern."""
@@ -1064,7 +1116,8 @@ def _analyse(save, frames, names, cfg, progress):
             r['will'] = willingness(pl) if will is None else will
             r['rel'] = rel_text(pl)
             r['nat'], r['nat_name'] = nations.nation_label(nnames, pl.get('nat'))
-            r['weaker_league'] = weaker_league(groups, my_lid, lid)
+            r['weaker_league'] = weaker_league(groups, my_lid, lid, club)
+            r['near_league'] = lid is not None and lid in near_lids
         return r
 
     from_fms = fd is not None
@@ -1083,7 +1136,10 @@ def _analyse(save, frames, names, cfg, progress):
     def quality_key(pl):
         return -(will[pl['id']] * (pl['ca'] - lo + 10))
     club_rep = {cid: c.get('rep') for cid, c in club_map.items()} if fd is not None else {}
-    chosen = select_pool(area, will, con, club_rep, quality_ok, quality_key)
+    chosen = select_pool(area, will, con, club_rep, quality_ok, quality_key,
+                         relevance=lambda pl: pool_relevance(pl, club_map, my_nat, near_lids, league_of),
+                         my_rep=club_rep.get(my_id),
+                         vis_ok=lambda pl: pl['club'] != 0 or age_of(pl['dob']) >= 18)
     pool = []
     for pl, vis in chosen:
         r = out_player(pl, False, will[pl['id']])

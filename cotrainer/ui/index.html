@@ -394,7 +394,7 @@ function spoilerAsk(level){const m=document.getElementById('modal');
  m.hidden=false;}
 function closeModal(){const m=document.getElementById('modal');m.hidden=true;m.innerHTML='';}
 function vTransfer(){const sl=slots(),aus=W.info==='aus',m=DATA.meta,sk=sortKey();
- const area=m.scout_note?esc(m.scout_note):m.scout_area_name?'Spieler aus deinem Scoutinggebiet: '+esc(m.scout_area_name):'';
+ const area=[m.scout_filter&&m.scout_area_name?'Spieler aus deinem Scoutinggebiet: '+esc(m.scout_area_name)+'.':'',m.scout_note?esc(m.scout_note):''].filter(Boolean).join(' ');
  return`<div class="card"><h2>Transfervorschläge passend zu deiner Taktik</h2>${infoBar()}
  <div class="filters"><label class="f">Position<select id="fpos" onchange="S.f.pos=this.value;save();renderSug()"><option value="">Alle Positionen</option>${sl.map((s,i)=>`<option value="${i}" ${String(S.f.pos)===String(i)?'selected':''}>${PDE[s.pos]} – ${esc(ROLES[s.ip].name)}</option>`).join('')}</select></label>
  <label class="f">Max. Alter<input type="number" value="${S.f.age}" style="width:80px" onchange="S.f.age=+this.value;save();renderSug()"></label>
@@ -403,7 +403,7 @@ function vTransfer(){const sl=slots(),aus=W.info==='aus',m=DATA.meta,sk=sortKey(
  ${aus?'':`<label class="f" style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" ${S.f.budget?'checked':''} onchange="S.f.budget=this.checked;save();renderSug()"> im Transferbudget</label>`}
  <label class="f" style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" ${S.f.free?'checked':''} onchange="S.f.free=this.checked;save();renderSug()"> nur ablösefrei/ auslaufend</label></div>
  ${area?`<p class="muted" style="margin:-4px 0 10px">${area}</p>`:''}
- <div id="sug"></div><p class="note">${aus?'':'Preis = geschätzter Marktwert aus Qualität, Alter, Liga und Vertragslaufzeit (keine Spielangabe). '}Wechselchance = Schätzung aus Vereinsstärke, Ligaumfeld, Ehrgeiz/Loyalität des Spielers und Vertragslaufzeit.</p></div>`;}
+ <div id="sug"></div><p class="note">${aus?'':'Preis = geschätzter Marktwert aus Qualität, Alter, Liga und Vertragslaufzeit (keine Spielangabe). '}${m.source==='fmsave'?'Wechselchance = Schätzung aus Vereinsreputation, Vertragslaufzeit, Alter und Persönlichkeit des Spielers.':'Wechselchance = Schätzung aus Vertragslaufzeit, Alter und Persönlichkeit des Spielers.'}</p></div>`;}
 /* Stufe „Aus“: nur sichtbare Spieler (p.vis), Positionen ≥ 15, eigene Startelf (an.assign) für die schwächsten Plätze */
 function renderSugAus(el,an){const sl=an.sl;
  const order=sl.map((s,i)=>[i,an.assign[i]?an.assign[i].sc:0]).sort((a,b)=>a[1]-b[1]).map(x=>x[0]);
@@ -412,8 +412,8 @@ function renderSugAus(el,an){const sl=an.sl;
  for(const p of DATA.pool){if(!p.vis)continue;if(p.age>S.f.age||(p.will??0)<S.f.will)continue;if(S.f.free&&!freeOrEnding(p))continue;
   if(!idx.some(i=>posRating(p,sl[i].pos)>=15))continue;
   const plW=posRating(p,weak.pos)>=15,pl3=[...weak3].some(x=>posRating(p,x)>=15),free=!p.club,left=daysLeft(p),ending=!free&&left!=null&&left<=365;
-  const rec=(plW?40:pl3?15:0)+(free?20:0)+(ending?15:0)+0.3*(p.will||0)+(p.age<=21?5:0);
-  const why=[];if(plW)why.push(`Spielt ${PDE[weak.pos]} – dort ist deine schwächste Position`);if(free)why.push('Vereinslos – ablösefrei');
+  const rec=(plW?40:pl3?15:0)+(free?8:0)+(p.near_league?10:0)+(ending?15:0)+0.3*(p.will||0)+(p.age<=21?5:0);
+  const why=[];if(plW)why.push(`Spielt ${PDE[weak.pos]} – dort ist deine schwächste Position`);if(p.near_league)why.push('Spielt in einer Liga deines Niveaus');if(free)why.push('Vereinslos – ablösefrei');
   if(ending)why.push(`Vertrag läuft ${mmyyyy(p.end)} aus`);if(p.weaker_league)why.push('Kommt aus einer schwächeren Liga – Wechsel wahrscheinlich');
   if(p.age<=21)why.push(`Jung (${p.age}) – Platz zum Entwickeln`);
   rows.push({p,rec,why:why.slice(0,2),i:idx.find(i=>posRating(p,sl[i].pos)>=15)});}
