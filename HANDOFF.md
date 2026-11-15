@@ -147,6 +147,14 @@ Nutzerdaten:
     - Tests: Plätze 2/3, übersprungener Kopf behält die Platznummer, nicht lesbare Spieltaktik, Index außerhalb (synthetisches `tactics_man`); JS: Randfälle `helpFor` (Grenze +1,0, Phase/Position, ohne Verursacher, unbekannte Rolle), alle Regeln von `leadHints`, `trainingWeak`, `sessionOrder`. Oberfläche im Entwicklermodus geprüft (Edge headless über DevTools-Protokoll, keine Konsolenfehler).
     - **Fehler Osijek behoben:** Die Oberfläche zeigte bei Osijek nichts, weil die Spielstile „Flügelspiel“ und „Direkt / lange Bälle“ die Positionsgruppe `ST` nutzen, die in `PG` fehlte (`TypeError … reading 'some'` in `styleMods`). Aufgefallen ist es erst, seit `GNIW` als Flügelspiel erkannt wird; vorher stürzte nur die Handauswahl dieser Stile ab. `PG.ST` ergänzt, Test `tests/test_ui_static.py` (jede in Stil-Modifikatoren benutzte Gruppe muss in `PG` stehen). Osijek und Ravenna mit allen sechs Stilen in der Oberfläche geprüft.
 
+21. **Teil 4 (15.11. abends): README, Lizenzhinweise, Version 1.0.0.** Branch `teil-4-release`, Plan `docs/superpowers/plans/2026-11-15-co-trainer-4-release.md`.
+    - `tools/third_party.py` sammelt die Lizenzen aller gebündelten Pakete (Laufzeitabhängigkeiten von `cotrainer` laut Paketangaben), Python, der DLLs ohne Python-Paket (OpenSSL, libffi, Expat, libmpdec, WebView2 SDK 1.0.3856.49; Texte aus den Originalquellen in `tools/licenses/`) und von PyInstaller in `THIRD_PARTY_LICENSES.txt`. `build.ps1` erzeugt die Datei neu und packt sie ein. Kommt ein Paket oder eine DLL dazu (Liste: `build/Co-Trainer/Analysis-00.toc`), muss `NATIVE` in `tools/third_party.py` nachgezogen werden.
+    - `build.ps1` schließt `setuptools`, `packaging` und `_distutils_hack` aus; cffi zog sie über `setuptools_ext` hinein, zur Laufzeit braucht sie niemand. Die `.exe` ist dadurch 12,1 statt 13,4 MB.
+    - Fenster „Über Co-Trainer“ (Seitenleiste und Fuß des Assistenten): Version, MIT, fmsave, Hinweis „Fanprojekt, keine Verbindung zu Sports Interactive oder SEGA“, Lizenzliste; Adressen nur als Text. `cotrainer/about.py`, `Api.about()`.
+    - `README.md` (Starten mit Windows-Schutzhinweis, Voraussetzungen, Sicherheit und Daten, Grenzen, Bauen aus dem Quellcode, Lizenz). Version 1.0.0 (Wunsch des Nutzers).
+    - Geprüft: gebaute `.exe` gestartet und über den WebView2-Debugport (`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=…`) `API.about()` aufgerufen: Version 1.0.0, Liste vollständig. Dieser Weg eignet sich allgemein, um die echte `.exe` automatisch zu prüfen.
+    - Abschließende Durchsicht durch einen frischen Reviewer: zwei wichtige Funde (fehlende Lizenzen für DLLs und PyInstaller, setuptools in der `.exe`) behoben. Zurückgestellt: `build.ps1` erzeugt die Lizenzliste erst nach den Tests (nach einem Paket-Update scheitert der Build deshalb an `test_checked_in_notices_match_installed_versions`; dann zuerst `.venv\Scripts\python tools\third_party.py` ausführen); `tools/third_party.py` prüft nicht, ob `cotrainer` installiert ist; `about.notices_text` fängt keinen Dekodierfehler.
+
 ## Erkenntnisse zum Spielstand-Format
 
 ### Container
@@ -366,13 +374,13 @@ Grundlage: `Trainertest 2.fm` (unverändert) gegen `Trainertest 2 traainer.fm` (
 
 ## Nächste Schritte
 
-### Als Nächstes (Stand 15.11. spät, `main` = Teile 1–3 + aktive Taktik + Kleinigkeiten aus Teil 3 (Punkt 20), `dist\Co-Trainer.exe` vom 15.11. 19:32 mit Punkt 20, 138 Tests grün)
+### Als Nächstes (Stand 15.11. abends, `main` = Teile 1–3 + Punkt 20, Branch `teil-4-release` = Teil 4 (Punkt 21), `dist\Co-Trainer.exe` 1.0.0 aus dem Branch, 150 Tests)
 
 1. ~~GitHub einrichten~~ erledigt am 15.11.: Remote `origin` = https://github.com/grimmok/Co-Trainer (privat, MIT-Lizenz aus GitHub übernommen), `main` verfolgt `origin/main`.
    - **Persönliche Daten aus der ganzen Historie entfernt** (Entscheidung des Nutzers, 15.11.): Autor und Committer heißen `grimmok` mit der noreply-Adresse `317344714+grimmok@users.noreply.github.com` (auch der von GitHub angelegte Startcommit); Benutzerpfade stehen als `%USERPROFILE%\…`, der Vorname ist entfernt. Danach Force-Push. `user.email` des Projekts steht auf der noreply-Adresse, `user.name` sollte für neue Commits ebenfalls `grimmok` sein. Die lokalen Zweige `backup-vor-noreply` und `backup-vor-grimmok` (und `refs/original`) halten die alten Stände mit den privaten Angaben; sie werden nie gepusht und können gelöscht werden.
    - `gh` ist weiter nicht angemeldet. Der Token steht in der Benutzervariable `GITHUB_PERSONAL_ACCESS_TOKEN`; Claude pusht damit über einen einmaligen `http.extraheader` (nichts gespeichert). Der GitHub-MCP-Server sieht den Token erst nach einem Neustart von Claude Code.
    - Das Repository bleibt privat, bis der Nutzer es selbst öffentlich schaltet (Entscheidung 15.11.). `config.json` (Karrieredaten aus dem Spiel, Entwicklerhilfe) ist eingecheckt.
-2. **Teil 4 planen und bauen** (Branch, dann Pull Request): README (Start, Windows-Schutzhinweis wegen fehlender Signatur, WebView2), Lizenzhinweise (`LICENSE` MIT liegt schon im Repo; Hinweis auf fmsave im Programm und im Repo fehlt, Spec Abschnitt 9), GitHub-Release mit `Co-Trainer.exe` (privat, bis der Nutzer umschaltet).
+2. ~~Teil 4~~ gebaut (Punkt 21), Pull Request `teil-4-release` → `main`. Danach Release `v1.0.0` mit `Co-Trainer.exe` (Text-Entwurf im Plan, Task 4); das Repo bleibt privat, bis der Nutzer umschaltet.
 3. **Rollentest (B.1)** hat Vorrang bei der Dekodierung: bei Osijek sind 17 von 22 Rollen unbekannt, bei „Ravenna 2 spieltaktik“ (5-2-3) 20.
 4. **Vom Nutzer zu bestätigen:** siehe A.7 (offen: Konter-/Ballbesitz-Annäherungen der Stil-Codes, Karte → Tendenz bei `sure:false`, Bereiche und Baustellen-Grenze 0,3 gegen „Taktische Effektivität“, ob in „2 spieltaktik“ die 5-2-3-Taktik die Spieltaktik ist, Stufengrenzen der Trainerbewertungen, Name „Co-Trainer“).
 5. ~~Zurückgestellte Kleinigkeiten aus Teil 3~~ erledigt (Punkt 20). Aufgefallen: Durchschnitte im Training und im Taktik-Reiter stehen mit Punkt statt Komma (z. B. „Ø 10.4“).
