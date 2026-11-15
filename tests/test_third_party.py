@@ -48,3 +48,33 @@ def test_checked_in_notices_match_installed_versions():
     for d in tp.runtime_dists():
         assert f"{d.metadata['Name']} {d.version} – " in t, d.metadata['Name']
     assert not re.search(r'Users\\[A-Za-z]', t)          # keine Pfade aus dem eigenen Rechner
+
+
+NATIVE_HEADS = ('OpenSSL 3', 'libffi', 'Expat', 'libmpdec', 'Microsoft WebView2 SDK 1.0.3856.49', 'PyInstaller')
+
+
+def test_render_includes_native_libraries_and_pyinstaller():
+    # Review: DLLs in der .exe (OpenSSL, libffi, WebView2 SDK, in Python eingebaut expat/libmpdec) und die
+    # Laufzeit-Hooks von PyInstaller (Apache-2.0) brauchen ihren Lizenztext
+    t = tp.render(tp.runtime_dists(), '3.12.x', 'PSF', tp.native_blocks())
+    ls = t.splitlines()
+    rule = '=' * 70
+    heads = [ls[i + 1] for i in range(len(ls) - 2) if ls[i] == rule and ls[i + 2] == rule]
+    i_py = next(i for i, h in enumerate(heads) if h.startswith('Python 3.12.x'))
+    for name in NATIVE_HEADS:
+        assert any(h.startswith(name) for h in heads[i_py + 1:]), name
+    for title, text in tp.native_blocks():
+        assert len(text) > 500 and ('Permission' in text or 'Redistribution' in text or 'Apache License' in text), title
+
+
+def test_checked_in_notices_cover_native_libraries():
+    t = (ROOT / 'THIRD_PARTY_LICENSES.txt').read_text(encoding='utf-8')
+    for name in NATIVE_HEADS:
+        assert '\n' + name in t, name
+
+
+def test_build_excludes_build_time_modules():
+    # cffi zieht über setuptools_ext setuptools und packaging in die .exe; zur Laufzeit braucht sie niemand
+    ps = (ROOT / 'build.ps1').read_text(encoding='utf-8')
+    for mod in ('setuptools', 'packaging', '_distutils_hack'):
+        assert f'--exclude-module {mod}' in ps, mod

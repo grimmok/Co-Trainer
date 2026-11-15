@@ -18,6 +18,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Lizenzliste konnte nicht erzeugt werden - es w
 # Eingepackt werden index.html, taktik.js und THIRD_PARTY_LICENSES.txt; dev-data.json und config.json bleiben draußen.
 & $python -m PyInstaller --noconfirm --clean --onefile --windowed --name Co-Trainer `
     --collect-submodules fmsave --copy-metadata fmsave --collect-all backports.zstd `
+    --exclude-module setuptools --exclude-module packaging --exclude-module _distutils_hack `
     --add-data 'cotrainer/ui/index.html;cotrainer/ui' --add-data 'cotrainer/ui/taktik.js;cotrainer/ui' --add-data 'THIRD_PARTY_LICENSES.txt;.' cotrainer/__main__.py
 if ($LASTEXITCODE -ne 0) { throw 'PyInstaller ist fehlgeschlagen.' }
 

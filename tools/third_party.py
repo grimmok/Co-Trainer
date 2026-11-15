@@ -14,7 +14,7 @@ from packaging.markers import Marker
 RULE = '=' * 70
 HEAD = ('Co-Trainer – Lizenzen der mitgelieferten Software\n\n'
         'Co-Trainer selbst steht unter der MIT-Lizenz (siehe LICENSE).\n'
-        'Die Datei Co-Trainer.exe enthält außerdem die folgenden Pakete.\n')
+        'Die Datei Co-Trainer.exe enthält außerdem die folgende Software.\n')
 LICENSE_FILE = re.compile(r'(^|/)(LICEN[CS]E|COPYING|NOTICE)[^/]*$', re.I)
 
 
@@ -86,24 +86,51 @@ def license_name(dist):
     return 'MIT' if 'Permission is hereby granted, free of charge' in license_text(dist) else 'unbekannt'
 
 
+LICENSES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'licenses')
+# Bibliotheken ohne eigenes Python-Paket, die trotzdem in der .exe stecken (Analysis-00.toc von PyInstaller):
+# OpenSSL-DLLs und libffi-8.dll kommen mit Python, expat und libmpdec sind in pyexpat.pyd/_decimal.pyd eingebaut,
+# das WebView2 SDK liegt in pywebview (webview/lib). Texte aus den Originalquellen, siehe tools/licenses.
+NATIVE = [
+    ('OpenSSL 3 (libcrypto-3-x64.dll, libssl-3-x64.dll) – Apache-2.0', 'apache-2.0.txt'),
+    ('libffi (libffi-8.dll) – MIT', 'libffi.txt'),
+    ('Expat (in pyexpat.pyd) – MIT', 'expat.txt'),
+    ('libmpdec (in _decimal.pyd) – BSD-2-Clause', 'mpdecimal.txt'),
+    ('Microsoft WebView2 SDK 1.0.3856.49 (in pywebview) – BSD-3-Clause', 'webview2-sdk.txt'),
+]
+
+
+def native_blocks():
+    """(Titel, Text) für mitgelieferte Bibliotheken ohne Python-Paket, dazu PyInstaller (Laufzeit-Hooks, Apache-2.0)."""
+    out = []
+    for title, name in NATIVE:
+        with open(os.path.join(LICENSES_DIR, name), encoding='utf-8') as fh:
+            out.append((title, fh.read()))
+    pyi = md.distribution('pyinstaller')
+    out.append((f'PyInstaller {pyi.version} (Startprogramm und Laufzeit-Hooks) – GPL-2.0 mit Ausnahme / Apache-2.0',
+                license_text(pyi)))
+    return out
+
+
 def _block(title, text):
     return f'{RULE}\n{title}\n{RULE}\n{text.strip()}\n'
 
 
-def render(dists, python_version, python_license):
+def render(dists, python_version, python_license, extras=()):
+    """Kopf, Python-Pakete (fmsave zuerst, Rest alphabetisch), Python, dann extras als (Titel, Text)."""
     first = [d for d in dists if _norm(d.metadata['Name']) == 'fmsave']
     rest = sorted((d for d in dists if d not in first), key=lambda d: d.metadata['Name'].lower())
     parts = [HEAD]
     for d in first + rest:
         parts.append(_block(f"{d.metadata['Name']} {d.version} – {license_name(d)}", license_text(d)))
     parts.append(_block(f'Python {python_version} – PSF-2.0', python_license))
+    parts.extend(_block(title, text) for title, text in extras)
     return '\n'.join(parts)
 
 
 def main(out='THIRD_PARTY_LICENSES.txt'):
     with open(os.path.join(sys.base_prefix, 'LICENSE.txt'), encoding='utf-8') as fh:
         py_license = fh.read()
-    text = render(runtime_dists(), platform.python_version(), py_license)
+    text = render(runtime_dists(), platform.python_version(), py_license, native_blocks())
     with open(out, 'w', encoding='utf-8', newline='\n') as fh:
         fh.write(text)
     print('Geschrieben:', out)

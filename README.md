@@ -14,7 +14,7 @@ Co-Trainer ist ein Fanprojekt und steht in keiner Verbindung zu Sports Interacti
 
 Die Transfervorschläge haben drei Informationsstufen: **Aus**, **Scoutbericht** und **Werte**. Voreingestellt ist „Aus“. Dann zeigt Co-Trainer über fremde Spieler nur, was du im Spiel auch ohne Scouting siehst, denn genaue Werte ungescouteter Spieler machen das Spiel leichter. Höhere Stufen schaltest du bewusst ein, mit Hinweis vorher.
 
-Fähigkeiten, Potenzial als Zahl und versteckte Attribute zeigt Co-Trainer nie. Potenzial erscheint höchstens als Text, zum Beispiel „Kann sich zu einem guten Zweitliga-Spieler entwickeln“.
+Aktuelle und potenzielle Fähigkeit als Zahl sowie versteckte Attribute zeigt Co-Trainer nie, auch nicht in der Stufe „Werte“. Potenzial erscheint höchstens als Text, zum Beispiel „Kann sich zu einem guten Zweitliga-Spieler entwickeln“.
 
 ## Starten
 
@@ -60,7 +60,7 @@ python -m uv pip install --python .venv -e ".[dev]"
 .\build.ps1                                               # baut dist\Co-Trainer.exe
 ```
 
-Die Tests mit echten Spielständen (Marke `save`) brauchen einen eigenen Spielstand; den Pfad gibst du mit der Umgebungsvariable `COTRAINER_TEST_SAVE` an. Die Taktiklogik in `tests/js/` braucht Node.js.
+Die Tests mit echten Spielständen (Marke `save`) sind auf die Testspielstände des Autors zugeschnitten und werden ohne sie übersprungen; für eigene Prüfungen gibt es den Konsolenlauf `.venv\Scripts\python -m cotrainer.extract`. Die Taktiklogik in `tests/js/` braucht Node.js.
 
 ## Lizenz
 
