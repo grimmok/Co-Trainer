@@ -309,6 +309,7 @@ Grundlage: `Trainertest 2.fm` (unverändert) gegen `Trainertest 2 traainer.fm` (
   - Unbekannte Vereine gelten als neutral.
   - **Keine Persönlichkeit** (Ehrgeiz, Loyalität) und keine Spielerqualität: beides sieht man im Spiel ohne Scouting nicht (Entscheidung des Nutzers, 15.11.).
 - **Stufe „Aus“, Sortierung „Empfehlung“, gemischt über die Ligen** (Entscheidung des Nutzers, 15.11.): `mixLeagues` in `index.html`; jeder weitere Spieler derselben Liga (Staffeln zusammengefasst, vereinslos und „ohne Liga“ je eine Gruppe) zählt `MIX_PEN` = 4 Punkte weniger. Ravenna, erste 80: Serie C 23, Serie BKT 19, ohne Liga 19, vereinslos 19 (vorher 80 × Serie C). Die anderen Sortierungen mischen nicht.
+- **Schalter „Auch außerhalb meines Scoutinggebiets suchen“** (15.11., Spec 7.2): Python liefert zusätzlich eine kleinere Auswahl außerhalb des Gebiets (`OUT_VIS_POOL` 2000 ohne CA/PA, `OUT_QUALITY_POOL` 2000), markiert mit `out: true`, und `meta.scout_outside`. Die Oberfläche zeigt sie nur bei eingeschaltetem Schalter (`S.f.outside`, im `localStorage`), mit Markierung „außerhalb“. Einschalten zeigt denselben Hinweis wie die Stufen; „Nicht mehr fragen“ gilt für beide. Kein Schalter bei „Weltweit“ oder ohne erkanntes Gebiet. Ravenna: 73.021 Spieler außerhalb, 3.720 im Pool; `dev-data.json` wächst dadurch von 3,8 auf 6,8 MB.
 - **Stufe „Scoutbericht“** zeigt keine Zahlen „Fit“ und „+ zur Startelf“; die gibt es nur in „Werte“ (Entscheidung des Nutzers, 15.11.).
 - **Marktwert** ist eine eigene Schätzung: `2200·e^((CA−50)/12,5)` mit Faktoren für Alter, Vertrag und Liga. Es ist kein Spielwert.
 - **Eigener Verein:** der Verein mit den meisten Spielern in den Trainingsbewertungen; sonst der Name aus `save_game_summary`.
@@ -337,6 +338,7 @@ Grundlage: `Trainertest 2.fm` (unverändert) gegen `Trainertest 2 traainer.fm` (
 - **Spielstandwahl:** Backups sind ausgeschlossen, aber `find_save` nimmt weiterhin den neuesten Spielstand *jeder* Karriere (keine Einschränkung auf einen Manager).
 - **Ungeprüfte Werte:** Das garantierte Mindestbudget für die nächste Saison ist nicht mit dem Spiel abgeglichen. Die Wechselchance ist eine Annahme (seit Teil 2b aus der Vereinsreputation).
 - **Osijek-Kontostand:** Der Test prüft nur „> 0“, weil der Nutzer mit Osijek weiterspielt. Abgleich per Screenshot am 15.11.: 6,82 Mio. € im Spiel, gelesen 6.824.841 €; Transferbudget, Gehaltskosten (2,37 Mio. €/J.) und verfügbares Gehaltsbudget (248K €/J.) stimmen ebenfalls.
+- **Ligen ohne Namen:** Einige Wettbewerbe heißen „Wettbewerb 6026“, „Wettbewerb 6027“ (u. a.), weil ihr Name in `lang_db` fehlt; sie erscheinen so in der Spalte „Liga“. „Testimonial“ (Abschiedsspiele) wurde als Liga erkannt und ist seit 15.11. in `CUP_WORDS` ausgeschlossen.
 - **Spiel läuft:** Speichert das Spiel während des Einlesens, bricht fmsave ab (`SaveChangedError`) und der eigene Leser findet bei Osijek keinen Kader. Dann den Spielstand später neu einlesen.
 
 ## Nächste Schritte
@@ -374,7 +376,7 @@ Stand 14.11.: **Teil 1 ist gebaut** (acht Tasks des Plans, Branch `programm-entw
    - ~~neue Wechselchance (aus Vereinsreputation)~~ vom Nutzer am 15.11. im Spiel bestätigt (Ravenna): Spaggiari 83 % → bereit zu Gesprächen, Luzi 49 % → will mehr. Ausnahme Finotti (49 %): „nicht interessiert, noch nicht lange bei meinem neuen Verein“ (im Juli gewechselt). Frisch gewechselte Spieler kennt die Wechselchance noch nicht. fmsave hat `Player.club_join_date`, aber im Ravenna-Spielstand (Spieldatum 8.8.2026) steht bei Finotti 1.9.2026 (Spiel: „im Juli gewechselt“) und bei Luzi 1.8.2026 (trotzdem verhandlungsbereit). Bedeutung des Felds unklar, deshalb noch nicht eingebaut;
    - ~~neuer Screenshot der Osijek-Finanzen~~ (15.11., stimmt);
    - Angrenzende Ligen bei Osijek laut Spiel: „HNL und 1. NL“ (eigene Liga plus eine darunter, darüber gibt es keine). Passt zur Regel „Stufe ± 1“; ob das Programm genau diese beiden Ligen wählt, ist mit Osijek noch nicht geprüft;
-   - der Schalter „Auch außerhalb meines Scoutinggebiets suchen“ fehlt noch.
+   - ~~der Schalter „Auch außerhalb meines Scoutinggebiets suchen“~~ gebaut am 15.11. (siehe „Getroffene Entscheidungen“).
    - Stil-Code `TREV` = Vertikales Tiki-Taka;
    - Stufengrenzen der Trainerbewertungen unterhalb von 18 (bisher nur aus Profil-Screenshots abgeleitet);
    - ob der Name „Co-Trainer“ frei ist (nicht geprüft).

@@ -387,21 +387,35 @@ function setInfo(level){if(level===W.info)return;const up=INFO.findIndex(x=>x[0]
  if(up&&!(W.state&&W.state.skip_spoiler_warning))return spoilerAsk(level);applyInfo(level,null);}
 function applyInfo(level,skip){W.info=level;if(W.state){W.state.info_level=level;if(skip)W.state.skip_spoiler_warning=true;}
  if(API&&API.set_info_level)API.set_info_level(level,skip?true:null);closeDrawer();render();}
-function spoilerAsk(level){const m=document.getElementById('modal');
- m.innerHTML=`<div class="card mdc"><h2>Mehr zeigen, als dein Scouting weiß?</h2><p>Diese Stufe zeigt Einschätzungen fremder Spieler, die du im Spiel erst durch Scouting bekommst. Das verändert dein Spielerlebnis und macht es leichter.</p>
+function spoilerAsk(level){askSpoiler('Diese Stufe zeigt Einschätzungen fremder Spieler, die du im Spiel erst durch Scouting bekommst.',s=>applyInfo(level,s));}
+/* Hinweis vor jeder bewussten Abkürzung (Stufen, Schalter „außerhalb“); onOk(skip) bekommt „Nicht mehr fragen“ */
+let ASK_OK=null;
+function askSpoiler(what,onOk){const m=document.getElementById('modal');ASK_OK=onOk;
+ m.innerHTML=`<div class="card mdc"><h2>Mehr zeigen, als dein Scouting weiß?</h2><p>${what} Das verändert dein Spielerlebnis und macht es leichter.</p>
  <label class="row" style="gap:6px;cursor:pointer"><input type="checkbox" id="noask"> Nicht mehr fragen</label>
- <div class="wzf"><button class="btn" id="mcancel" onclick="closeModal()">Abbrechen</button><button class="btn pri" id="mok" onclick="const s=document.getElementById('noask').checked;closeModal();applyInfo('${level}',s)">Trotzdem einblenden</button></div></div>`;
+ <div class="wzf"><button class="btn" id="mcancel" onclick="closeModal()">Abbrechen</button><button class="btn pri" id="mok" onclick="const s=document.getElementById('noask').checked,f=ASK_OK;closeModal();f&&f(s)">Trotzdem einblenden</button></div></div>`;
  m.hidden=false;}
-function closeModal(){const m=document.getElementById('modal');m.hidden=true;m.innerHTML='';}
+/* Schalter „Auch außerhalb meines Scoutinggebiets suchen“: Spieler mit p.out nur bei S.f.outside */
+function setOutside(el){if(!el.checked){S.f.outside=false;save();render();return;}
+ const on=()=>{S.f.outside=true;save();render();};
+ if(W.state&&W.state.skip_spoiler_warning)return on();
+ el.checked=false;
+ askSpoiler('Spieler außerhalb deines Scoutinggebiets kennst du im Spiel erst, wenn deine Scouts dort suchen.',s=>{
+  if(s){if(W.state)W.state.skip_spoiler_warning=true;if(API&&API.set_info_level)API.set_info_level(W.info,true);}on();});}
+const showOut=p=>!p.out||(S.f.outside&&DATA.meta.scout_outside);
+const outPill=p=>p.out?' <span class="pill w" title="Außerhalb deines Scoutinggebiets">außerhalb</span>':'';
+function closeModal(){const m=document.getElementById('modal');m.hidden=true;m.innerHTML='';ASK_OK=null;}
 function vTransfer(){const sl=slots(),aus=W.info==='aus',m=DATA.meta,sk=sortKey();
- const area=[m.scout_filter&&m.scout_area_name?'Spieler aus deinem Scoutinggebiet: '+esc(m.scout_area_name)+'.':'',m.scout_note?esc(m.scout_note):''].filter(Boolean).join(' ');
+ const outOn=S.f.outside&&m.scout_outside;
+ const area=[m.scout_filter&&m.scout_area_name?(outOn?'Spieler aus deinem Scoutinggebiet ('+esc(m.scout_area_name)+') und eine Auswahl von außerhalb.':'Spieler aus deinem Scoutinggebiet: '+esc(m.scout_area_name)+'.'):'',m.scout_note?esc(m.scout_note):''].filter(Boolean).join(' ');
  return`<div class="card"><h2>Transfervorschläge passend zu deiner Taktik</h2>${infoBar()}
  <div class="filters"><label class="f">Position<select id="fpos" onchange="S.f.pos=this.value;save();renderSug()"><option value="">Alle Positionen</option>${sl.map((s,i)=>`<option value="${i}" ${String(S.f.pos)===String(i)?'selected':''}>${PDE[s.pos]} – ${esc(ROLES[s.ip].name)}</option>`).join('')}</select></label>
  <label class="f">Max. Alter<input type="number" value="${S.f.age}" style="width:80px" onchange="S.f.age=+this.value;save();renderSug()"></label>
  <label class="f">Min. Wechselchance %<input type="number" value="${S.f.will}" style="width:90px" onchange="S.f.will=+this.value;save();renderSug()"></label>
  <label class="f">Sortierung<select onchange="S.f.sort=this.value;save();renderSug()">${(aus?SORTS.aus:SORTS.full).map(([k,l])=>`<option value="${k}" ${sk===k?'selected':''}>${l}</option>`).join('')}</select></label>
  ${aus?'':`<label class="f" style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" ${S.f.budget?'checked':''} onchange="S.f.budget=this.checked;save();renderSug()"> im Transferbudget</label>`}
- <label class="f" style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" ${S.f.free?'checked':''} onchange="S.f.free=this.checked;save();renderSug()"> nur ablösefrei/ auslaufend</label></div>
+ <label class="f" style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" ${S.f.free?'checked':''} onchange="S.f.free=this.checked;save();renderSug()"> nur ablösefrei/ auslaufend</label>
+ ${m.scout_outside?`<label class="f" style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="fout" ${outOn?'checked':''} onchange="setOutside(this)"> Auch außerhalb meines Scoutinggebiets suchen</label>`:''}</div>
  ${area?`<p class="muted" style="margin:-4px 0 10px">${area}</p>`:''}
  <div id="sug"></div><p class="note">${aus?'':'Preis = geschätzter Marktwert aus Qualität, Alter, Liga und Vertragslaufzeit (keine Spielangabe). '}${m.source==='fmsave'?'Wechselchance = Schätzung aus Vereinsreputation, Vertragslaufzeit und Alter.':'Wechselchance = Schätzung aus Vertragslaufzeit und Alter.'}</p></div>`;}
 /* Mischung über Ligen: jeder weitere Spieler derselben Liga (Staffeln zusammengefasst, vereinslos und ohne Liga
@@ -419,7 +433,7 @@ function renderSugAus(el,an){const sl=an.sl;
  const order=sl.map((s,i)=>[i,an.assign[i]?an.assign[i].sc:0]).sort((a,b)=>a[1]-b[1]).map(x=>x[0]);
  const weak=sl[order[0]],weak3=new Set(order.slice(0,3).map(i=>sl[i].pos));
  const idx=S.f.pos===''?sl.map((_,i)=>i):[+S.f.pos];const rows=[];
- for(const p of DATA.pool){if(!p.vis)continue;if(p.age>S.f.age||(p.will??0)<S.f.will)continue;if(S.f.free&&!freeOrEnding(p))continue;
+ for(const p of DATA.pool){if(!p.vis||!showOut(p))continue;if(p.age>S.f.age||(p.will??0)<S.f.will)continue;if(S.f.free&&!freeOrEnding(p))continue;
   if(!idx.some(i=>posRating(p,sl[i].pos)>=15))continue;
   const plW=posRating(p,weak.pos)>=15,pl3=[...weak3].some(x=>posRating(p,x)>=15),free=!p.club,left=daysLeft(p),ending=!free&&left!=null&&left<=365;
   const rec=(plW?40:pl3?15:0)+(free?8:0)+(p.near_league?10:0)+(ending?15:0)+0.3*(p.will||0)+(p.age<=21?5:0);
@@ -434,14 +448,14 @@ function renderSugAus(el,an){const sl=an.sl;
  el.innerHTML=`<div class="tblw"><table class="tbl"><thead><tr><th>Spieler</th><th>Positionen</th><th>Verein · Liga</th><th>Vertrag bis</th><th class="num">Wechselchance</th><th>Grund</th></tr></thead><tbody>
  ${top.map(x=>{const p=x.p;
   return`<tr class="click" onclick="openPlayer(${p.id},${x.i})"><td><div class="pname">${esc(p.n)}</div><div class="psub">${p.age} J. · ${esc(p.nat||'–')}</div></td>
-  <td>${posNames(p)||'–'}</td><td>${esc(p.club||'vereinslos')}${p.lg?'<div class="psub">'+esc(p.lg)+'</div>':''}</td>
+  <td>${posNames(p)||'–'}</td><td>${esc(p.club||'vereinslos')}${outPill(p)}${p.lg?'<div class="psub">'+esc(p.lg)+'</div>':''}</td>
   <td class="psub">${p.end?new Date(p.end).toLocaleDateString('de-DE'):'–'}</td><td class="num"><b>${p.will??'–'} %</b></td>
   <td class="psub" style="max-width:300px">${x.why.map(esc).join('<br>')||'–'}</td></tr>`;}).join('')}</tbody></table></div>
  <p class="note">${rows.length} Spieler passen zu den Positionen deiner Startelf, angezeigt werden die ersten 80. Reihenfolge nur nach dem, was du im Spiel ohne Scouting siehst: Position, Vertrag, Wechselchance, Alter${sortKey()==='rec'?', gemischt über die Ligen':''}.</p>`;}
 function renderSug(){const el=document.getElementById('sug');if(!el)return;const an=analyze(),sl=an.sl,f=DATA.meta.finances||{},bud=f.transfer_budget||0;
  if(W.info==='aus')return renderSugAus(el,an);const rep=W.info==='scoutbericht';
  const idx=S.f.pos===''?sl.map((_,i)=>i):[+S.f.pos];const rows=[];
- for(const p of DATA.pool){if(p.age>S.f.age||(p.will??0)<S.f.will)continue;if(S.f.budget&&p.val>bud)continue;
+ for(const p of DATA.pool){if(!showOut(p))continue;if(p.age>S.f.age||(p.will??0)<S.f.will)continue;if(S.f.budget&&p.val>bud)continue;
   if(S.f.free&&!freeOrEnding(p))continue;
   let best=null;for(const i of idx){const s=sl[i];if(posRating(p,s.pos)<12&&!(RELATED[s.pos]||[]).some(x=>posRating(p,x)>=15))continue;
    const sc=slotScore(p,s);const cur=an.assign[i]?an.assign[i].sc:0;const gain=sc-cur;if(!best||gain>best.gain)best={i,sc,gain};}
@@ -452,7 +466,7 @@ function renderSug(){const el=document.getElementById('sug');if(!el)return;const
  el.innerHTML=`<div class="tblw"><table class="tbl"><thead><tr>${rep?'':'<th>Fit</th>'}<th>Spieler</th><th>Position</th>${rep?'':'<th class="num">+ zur Startelf</th>'}<th>Entwicklung</th>${rep?'<th>Einordnung</th><th>Bericht</th>':''}<th class="num">Wechselchance</th><th class="num">Preis (geschätzt)</th><th class="num">Gehalt/Jahr</th><th>Vertrag</th></tr></thead><tbody>
  ${top.map(x=>{const p=x.p,s=sl[x.i],w=p.will,wc=w>=60?'good':w>=35?'':w>=20?'warn':'bad';
   return`<tr class="click" onclick="openPlayer(${p.id},${x.i})">${rep?'':`<td><div class="fit" style="--v:${Math.round(x.sc)};--c:var(--acc)"><span>${Math.round(x.sc)}</span></div></td>`}
-  <td><div class="pname">${esc(p.n)}</div><div class="psub">${p.age} J. · ${esc(p.club||'vereinslos')}${p.lg?' · '+esc(p.lg):''}</div></td>
+  <td><div class="pname">${esc(p.n)}${outPill(p)}</div><div class="psub">${p.age} J. · ${esc(p.club||'vereinslos')}${p.lg?' · '+esc(p.lg):''}</div></td>
   <td>${PDE[s.pos]}<div class="psub">${esc(ROLES[s.ip].name)}</div></td>${rep?'':`<td class="num good"><b>+${Math.round(x.gain)}</b></td>`}
   <td class="psub" style="max-width:240px">${esc(p.pot)}</td>${rep?`<td class="psub">${p.rel?esc(p.rel)+' als dein Kader':'–'}</td><td class="psub" style="max-width:260px">${scoutLines(p,s).map(esc).join('<br>')}</td>`:''}<td class="num"><b class="${wc}">${w} %</b></td>
   <td class="num">${money(p.val)}${p.val>bud?'<div><span class="pill b">über Budget</span></div>':''}</td><td class="num">${money(yr(p.wage))}${p.wage>(f.wage_budget_week||0)*0.08?'<div><span class="pill w">teuer</span></div>':''}</td>
@@ -468,7 +482,7 @@ function openPlayer(id,slotIdx){const own=DATA.squad.find(x=>x.id===id),p=own||D
  const level=own?'werte':W.info;
  if(level==='aus'){document.getElementById('drawer').innerHTML=`${head}
   <div class="card" style="margin-top:14px"><b>Alter:</b> ${p.age} Jahre<br><b>Nation:</b> ${esc(p.nat_name||p.nat||'–')}<br><b>Verein:</b> ${esc(p.club||'vereinslos')}<br><b>Liga:</b> ${esc(p.lg||'–')}
-  <br><b>Positionen:</b> ${best||'–'}<br><b>Vertrag:</b> ${p.end?'bis '+new Date(p.end).toLocaleDateString('de-DE'):'–'}<br><b>Wechselchance:</b> ${p.will!=null?p.will+' %':'–'}</div>
+  <br><b>Positionen:</b> ${best||'–'}<br><b>Vertrag:</b> ${p.end?'bis '+new Date(p.end).toLocaleDateString('de-DE'):'–'}<br><b>Wechselchance:</b> ${p.will!=null?p.will+' %':'–'}${p.out?'<br><span class="pill w">außerhalb deines Scoutinggebiets</span>':''}</div>
   <p class="note">Informationsstufe „Aus“: Einschätzungen zu Stärken, Entwicklung und Preis bekommst du im Spiel erst durch Scouting.</p>`;
   document.body.classList.add('dr');return;}
  const rs=level==='scoutbericht'?(s||an.sl.find(x=>posRating(p,x.pos)>=15)||an.sl[0]):null;

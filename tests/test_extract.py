@@ -154,6 +154,14 @@ def test_squad_and_pool_scope_depend_on_source():
     assert extract.in_pool_scope(loaned_out, me, False) is True
 
 
+def test_cup_words_skip_testimonials_but_not_leagues():
+    # „Testimonial“ (Abschiedsspiele) wurde bei Sligo Rovers und Portsmouth als Liga angezeigt (15.11.)
+    for name in ('Testimonial', 'Coppa Italia', 'Friendly', 'Champions League'):
+        assert X.CUP_WORDS.search(name), name
+    for name in ('Serie C/B', 'Premier League', 'First Division', 'Sky Bet League One', '3. Liga'):
+        assert not X.CUP_WORDS.search(name), name
+
+
 def test_read_scout_area_variants():
     def area(b):
         return extract.read_scout_area({0: bytes(20) + b + bytes(20)}, {'humans': 0})
@@ -422,9 +430,20 @@ def test_ravenna_scout_area(ravenna_data):
     assert m['scout_filter'] == m['scout_area'] and m['nat'] == 'ITA'
     pool = ravenna_data['pool']
     assert pool and all(p['nat'] != '–' for p in pool[:200])
-    assert any(p['vis'] for p in pool) and sum(p['vis'] for p in pool) <= X.VIS_POOL
-    assert len(pool) <= 8000
+    inside = [p for p in pool if not p.get('out')]
+    out = [p for p in pool if p.get('out')]
+    assert any(p['vis'] for p in inside) and sum(p['vis'] for p in inside) <= X.VIS_POOL
+    assert len(inside) <= X.VIS_POOL + X.QUALITY_POOL
     assert all(isinstance(p['weaker_league'], bool) and isinstance(p['near_league'], bool) for p in pool)
-    vis = [p for p in pool if p['vis']]
+    # Schalter „Auch außerhalb meines Scoutinggebiets suchen“: eigene, markierte Auswahl außerhalb von Italien
+    assert m['scout_outside'] is True and out and len(out) <= X.OUT_VIS_POOL + X.OUT_QUALITY_POOL
+    assert any(p['vis'] for p in out) and sum(p['vis'] for p in out) <= X.OUT_VIS_POOL
+    italian = ('Serie A', 'Serie BKT', 'Serie C/A', 'Serie C/B', 'Serie C/C')
+    assert not any(p['lg'] in italian for p in out)
+    assert all(p['nat'] != 'ITA' for p in out if not p['club'])                 # Vereinslose: eigene Nationalität
+    assert all(p['lg'] in italian or not p['lg'] for p in inside)
+    assert not {p['id'] for p in inside} & {p['id'] for p in out}
+    assert all(p['out'] is True for p in out) and all('out' not in p for p in inside)
+    vis = [p for p in inside if p['vis']]
     assert any(p['lg'] == 'Serie BKT' for p in vis) and any(p['weaker_league'] for p in vis)
     assert not any(not p['club'] and p['age'] < 18 for p in vis)

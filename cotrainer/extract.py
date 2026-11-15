@@ -344,7 +344,7 @@ def competitions(frames, names, cnames):
 
 CUP_WORDS = re.compile(r'cup|coppa|pokal|copa|coupe|trophy|taça|beker|kupa|puchar|champions|europa|conference|'
                        r'libertadores|sudamericana|super|shield|play-?off|qualif|friendly|youth|u1\d|u2\d|reserve|'
-                       r'trofeo|supercopa|charity|vase|community', re.I)
+                       r'trofeo|supercopa|charity|vase|community|testimonial', re.I)
 
 
 def training(frames, names):
@@ -797,6 +797,8 @@ def in_scout_area(pl, ctx):
 SCOUT_NOTE_MISSING = 'Scoutinggebiet nicht gefunden – Vorschläge aus allen Ländern.'
 SCOUT_NOTE_NO_FMS = 'Ohne fmsave kann das Scoutinggebiet nicht angewendet werden – Vorschläge aus allen Ländern.'
 VIS_POOL, QUALITY_POOL = 4000, 4000
+# Schalter „Auch außerhalb meines Scoutinggebiets suchen“ (Spec 7.2): kleinere, als „out“ markierte Auswahl
+OUT_VIS_POOL, OUT_QUALITY_POOL = 2000, 2000
 
 
 REP_PER_POINT = 50          # Reputationsabstand → Skala des früheren Stärkeabstands (Serie A ↔ Serie C ≈ 56)
@@ -1120,10 +1122,12 @@ def _analyse(save, frames, names, cfg, progress):
     from_fms = fd is not None
     squad = [out_player(pl, True) for pl in players.values() if in_squad(pl, my_id, from_fms)]
     require_squad(squad, os.path.basename(save))
-    # Pool: nur Spieler im Scoutinggebiet, in zwei Auswahlen
-    area = [pl for pl in players.values() if in_pool_scope(pl, my_id, from_fms) and 16 <= age_of(pl['dob']) <= 35
-            and in_scout_area(pl, ctx)]
-    will = {pl['id']: willingness(pl) for pl in area}
+    # Pool: Spieler im Scoutinggebiet, in zwei Auswahlen; dazu eine kleinere Auswahl außerhalb (Schalter, „out“)
+    area, outside = [], []
+    for pl in players.values():
+        if in_pool_scope(pl, my_id, from_fms) and 16 <= age_of(pl['dob']) <= 35:
+            (area if in_scout_area(pl, ctx) else outside).append(pl)
+    will = {pl['id']: willingness(pl) for pl in area + outside}
     # Qualitätsauswahl: für das eigene Niveau realistisch interessant (nur intern nach CA/PA)
     lo, hi = my_str - 15, my_str + 35
 
@@ -1133,17 +1137,24 @@ def _analyse(save, frames, names, cfg, progress):
     def quality_key(pl):
         return -(will[pl['id']] * (pl['ca'] - lo + 10))
     club_rep = {cid: c.get('rep') for cid, c in club_map.items()} if fd is not None else {}
-    chosen = select_pool(area, will, con, club_rep, quality_ok, quality_key,
-                         relevance=lambda pl: pool_relevance(pl, club_map, my_nat, near_lids, league_of),
-                         my_rep=club_rep.get(my_id),
-                         vis_ok=lambda pl: pl['club'] != 0 or age_of(pl['dob']) >= 18)
+
+    def choose(group, vis_n, quality_n):
+        return select_pool(group, will, con, club_rep, quality_ok, quality_key,
+                           relevance=lambda pl: pool_relevance(pl, club_map, my_nat, near_lids, league_of),
+                           my_rep=club_rep.get(my_id),
+                           vis_ok=lambda pl: pl['club'] != 0 or age_of(pl['dob']) >= 18,
+                           vis_n=vis_n, quality_n=quality_n)
+    chosen = choose(area, VIS_POOL, QUALITY_POOL)
+    chosen_out = choose(outside, OUT_VIS_POOL, OUT_QUALITY_POOL) if outside else []
     pool = []
-    for pl, vis in chosen:
+    for (pl, vis), out in [(c, False) for c in chosen] + [(c, True) for c in chosen_out]:
         r = out_player(pl, False, will[pl['id']])
         r['vis'] = vis
+        if out:
+            r['out'] = True
         pool.append(r)
     log('Kader', len(squad), 'Pool', len(pool), '| im Scoutinggebiet', len(area),
-        '| sichtbar (vis)', sum(v for _, v in chosen))
+        '| sichtbar (vis)', sum(v for _, v in chosen), '| außerhalb', len(outside), 'davon im Pool', len(chosen_out))
 
     # Taktik: Positionen + Rollen aus dem Spielstand, Anweisungen/Feedback aus config.json
     tactic = dict(club_cfg.get('tactic', {}))
@@ -1179,7 +1190,7 @@ def _analyse(save, frames, names, cfg, progress):
     return dict(
         meta=dict(source=source, manager=manager, date=game_date.isoformat(), club=my.get('name'), club_short=my.get('short'),
                   scout_area=scout_area, scout_area_name=SCOUT_AREAS.get(scout_area),
-                  scout_filter=ctx.area if ctx else None, scout_note=scout_note,
+                  scout_filter=ctx.area if ctx else None, scout_note=scout_note, scout_outside=bool(chosen_out),
                   nat=my_nat_code, nat_name=my_nat_name,
                   league=my_league.get('name', ''), league_long=my_league.get('long', ''),
                   finances=fin, save=os.path.basename(save), created=datetime.datetime.now().isoformat(timespec='minutes'),
