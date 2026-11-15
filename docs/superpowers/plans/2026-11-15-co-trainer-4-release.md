@@ -26,7 +26,7 @@
 ## Review Focus
 
 1. **Lizenzdatei fehlt im gepackten Programm** (z. B. `build.ps1` ohne `--add-data`): „Über Co-Trainer“ öffnet trotzdem und sagt im Klartext, dass die Lizenzhinweise fehlen, statt abzustürzen. → Task 2, `test_about_without_notices_file`.
-2. **Paket ohne Lizenztext** (proxy_tools 1.0.0 liefert keinen): Das Skript bricht nicht ab, sondern nennt Lizenz laut Paketangaben und Projektadresse. → Task 1, `test_license_text_falls_back_to_metadata`.
+2. **Paket ohne Lizenztext** (proxy_tools 0.1.0 liefert keinen): Das Skript bricht nicht ab, sondern nennt Lizenz laut Paketangaben und Projektadresse. → Task 1, `test_license_text_falls_back_to_metadata`.
 3. **Veraltete Lizenzliste nach einem Paket-Update:** Die eingecheckte Datei nennt jede gebündelte Laufzeitabhängigkeit mit der installierten Version. → Task 1, `test_checked_in_notices_match_installed_versions`.
 4. **Klick auf eine Adresse im Fenster „Über“** würde die Oberfläche durch eine fremde Seite ersetzen: Das Fenster enthält keine `<a href="http…">`. → Task 2, `test_about_modal_has_no_external_links`.
 5. **Entwicklermodus (`?dev=1`)** hat kein Python: Die nachgestellte API braucht `about`, sonst wirft der Klick einen Fehler. → Task 2, `test_dev_api_has_about`.
