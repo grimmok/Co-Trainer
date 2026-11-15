@@ -369,9 +369,8 @@ Stand 14.11.: **Teil 1 ist gebaut** (acht Tasks des Plans, Branch `programm-entw
    - ~~Ligastufe je Wettbewerb~~ (aus Reputation abgeleitet, Bestätigung offen), ~~56 Länder ohne Namen~~ und ~~Nationentabelle~~ erledigt in Teil 2b.
    - Optional: welche Spieler den Mitarbeitern bekannt sind (für „Kein Scouting“; bis dahin gilt die Regel „vertragslose Spieler der Vereinsnation“).
 7. **Vom Nutzer zu bestätigen, wenn es sich ergibt:**
-   - ob bei „Angrenzende Ligen“ alle Serie-C-Staffeln gemeint sind (Annahme Claude: ja);
-   - **Teil 2b:** Ligastufe aus Reputation (prüfen in der Spielerdatenbank mit Scoutinggebiet „Angrenzende Ligen“);
-   - Regionen außer 11 sind übertragen, nicht geprüft (Kosovo liegt laut Nationentabelle ebenfalls in Region 11, Südeuropa, steht aber nicht in der bisherigen Liste);
+   - ~~ob bei „Angrenzende Ligen“ alle Serie-C-Staffeln gemeint sind~~ und ~~Ligastufe aus Reputation~~: vom Spiel bestätigt (Screenshot 15.11.): Ravenna „Angrenzende Ligen“ = „Serie BKT, Serie C, LND“ (LND = Serie D, nicht spielbar), „Serie C“ = „Spieler in unserer Liga“. Seitdem umfasst auch „Eigene Liga“ alle Staffeln (vorher nur die eigene);
+   - Regionen außer 11 sind übertragen, nicht geprüft. ~~Kosovo~~ vom Nutzer am 15.11. als Südeuropa bestätigt (Programm: Region 11; im Spiel nannte der Nutzer „eindeutige ID 13“, vermutlich die ID der Region im Spiel, die anders zählt als der Spielstand);
    - ~~neue Wechselchance (aus Vereinsreputation)~~ vom Nutzer am 15.11. im Spiel bestätigt (Ravenna): Spaggiari 83 % → bereit zu Gesprächen, Luzi 49 % → will mehr. Ausnahme Finotti (49 %): „nicht interessiert, noch nicht lange bei meinem neuen Verein“ (im Juli gewechselt). Frisch gewechselte Spieler kennt die Wechselchance noch nicht. fmsave hat `Player.club_join_date`, aber im Ravenna-Spielstand (Spieldatum 8.8.2026) steht bei Finotti 1.9.2026 (Spiel: „im Juli gewechselt“) und bei Luzi 1.8.2026 (trotzdem verhandlungsbereit). Bedeutung des Felds unklar, deshalb noch nicht eingebaut;
    - ~~neuer Screenshot der Osijek-Finanzen~~ (15.11., stimmt);
    - Angrenzende Ligen bei Osijek laut Spiel: „HNL und 1. NL“ (eigene Liga plus eine darunter, darüber gibt es keine). Passt zur Regel „Stufe ± 1“; ob das Programm genau diese beiden Ligen wählt, ist mit Osijek noch nicht geprüft;

@@ -284,6 +284,15 @@ def test_scout_context_needs_own_league_for_league_areas():
     assert X.scout_context(None, 776, 22, tiers, comps, geo, {}) == (None, X.SCOUT_NOTE_MISSING)
 
 
+def test_own_league_includes_all_staffeln():
+    # Spiel (Screenshot 15.11.): „Serie C – Umfasst Spieler in unserer Liga“ = alle drei Staffeln
+    tiers = {21: (776, 2), 31: (776, 3), 32: (776, 3), 33: (776, 3), 40: (769, 3)}
+    comps = {21: dict(teams=[1]), 31: dict(teams=[2]), 32: dict(teams=[3]), 33: dict(teams=[4]),
+             40: dict(teams=[5])}
+    ctx, note = X.scout_context(2, 776, 32, tiers, comps, {776: (2, 11)}, {})
+    assert note is None and ctx.league_teams == {2, 3, 4}
+
+
 def test_willingness_uses_club_reputation():
     cm = {1: dict(rep=4300), 2: dict(rep=7100), 3: dict(rep=4000), 4: dict(rep=0), 5: dict()}
     assert X.club_rep_diff(2, 1, cm) == 56                       # Serie A gegen Serie C

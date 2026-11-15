@@ -909,7 +909,9 @@ def scout_context(scout_area, my_nat, my_lid, tiers, comps, geo, club_map):
             or (scout_area in (2, 3) and my_lid not in tiers)):
         return None, SCOUT_NOTE_MISSING
     return ScoutCtx(area=scout_area, nat=my_nat, continent=g[0] if g else 255, region=g[1] if g else 0,
-                    league_teams=set(comps.get(my_lid, {}).get('teams', ())),
+                    # „Eigene Liga“ = alle Staffeln (gleiches Land, gleiche Stufe), laut Spiel bestätigt (15.11.)
+                    league_teams={t for lid, lt in tiers.items() if lt == tiers.get(my_lid)
+                                  for t in comps.get(lid, {}).get('teams', ())},
                     adjacent_teams={t for lid in adjacent_leagues(tiers, my_lid) for t in comps[lid]['teams']},
                     geo=geo, club_map=club_map), None
 
