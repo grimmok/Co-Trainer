@@ -173,3 +173,65 @@ def test_ravenna_reads_first_team_from_fmsave(ravenna_data):
     assert 24 <= len(ravenna_data["squad"]) <= 28                    # 27 in der ersten Mannschaft
     assert sum(1 for p in ravenna_data["squad"] if p.get("tr")) >= 23  # Bewertungen zugeordnet (gemessen: 23)
     assert len(m["rivals"]) == 18
+
+
+# ---------------------------------------------------------------- Ligastufe und Scoutinggebiet
+X = extract
+
+
+def test_league_base():
+    assert X.league_base('Serie C/B') == 'Serie C'
+    assert X.league_base('Serie A') == 'Serie A'
+    assert X.league_base('Regionalliga Gruppe Nord') == 'Regionalliga'
+
+
+def test_league_tiers_groups_and_order():
+    clubs = {i: dict(nat=776, rep=r) for i, r in [(1, 7000), (2, 7200), (3, 5600), (4, 5500), (5, 4300), (6, 4400), (7, 4500)]}
+    ll = {22: dict(name='Serie A', teams=[1, 2]), 23: dict(name='Serie BKT', teams=[3, 4]),
+          3484: dict(name='Serie C/A', teams=[5]), 3485: dict(name='Serie C/B', teams=[6]), 3486: dict(name='Serie C/C', teams=[7])}
+    t = X.league_tiers(ll, clubs)
+    assert t[22] == (776, 1) and t[23] == (776, 2)
+    assert t[3484] == t[3485] == t[3486] == (776, 3)
+
+
+def _ctx(area):
+    geo = {776: (2, 11), 1: (2, 11), 769: (2, 25), 1657: (5, 21)}
+    cm = {10: dict(nat=776), 11: dict(nat=776), 12: dict(nat=769), 13: dict(nat=1657), 14: dict(nat=1)}
+    return X.ScoutCtx(area=area, nat=776, continent=2, region=11, league_teams={10}, adjacent_teams={10, 11},
+                      geo=geo, club_map=cm)
+
+
+@pytest.mark.parametrize('area,club,nat,expected', [
+    (1, 0, 776, True), (1, 0, 769, False), (1, 10, 776, False),
+    (2, 10, 769, True), (2, 11, 776, False),
+    (3, 11, 776, True), (3, 12, 776, False),
+    (4, 11, 769, True), (4, 0, 776, True), (4, 12, 776, False),
+    (5, 14, 769, True), (5, 12, 776, False),
+    (6, 12, 1657, True), (6, 13, 776, False),
+    (7, 13, 1657, True),
+])
+def test_in_scout_area(area, club, nat, expected):
+    assert X.in_scout_area(dict(club=club, nat=nat), _ctx(area)) is expected
+
+
+def test_no_ctx_means_worldwide():
+    assert X.in_scout_area(dict(club=12, nat=None), None) is True
+
+
+def test_club_without_league_outside_league_areas():
+    pl = dict(club=99, nat=776)                     # Verein ohne spielbare Liga
+    ctx = _ctx(2); ctx.club_map[99] = dict(nat=776)
+    assert X.in_scout_area(pl, ctx) is False
+    ctx.area = 4
+    assert X.in_scout_area(pl, ctx) is True
+
+
+@pytest.mark.save
+def test_ravenna_scout_area(ravenna_data):
+    m = ravenna_data['meta']
+    assert m['scout_filter'] == m['scout_area'] and m['nat'] == 'ITA'
+    pool = ravenna_data['pool']
+    assert pool and all(p['nat'] != '–' for p in pool[:200])
+    assert any(p['vis'] for p in pool) and sum(p['vis'] for p in pool) <= 3000
+    assert len(pool) <= 7000
+    assert all(isinstance(p['weaker_league'], bool) for p in pool)

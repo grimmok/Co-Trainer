@@ -10,6 +10,7 @@ Der Spielstand wird nur gelesen, nie verändert.
 """
 import array, bisect, datetime, glob, json, math, os, re, struct, sys, time
 from collections import Counter, defaultdict
+from dataclasses import dataclass
 
 import zstandard
 
@@ -696,6 +697,84 @@ def in_pool_scope(pl, my_id, from_fms):
     return pl['club'] != my_id and not (from_fms and pl.get('loan_parent') == my_id)
 
 
+# ---------------------------------------------------------------- Ligastufe und Scoutinggebiet
+_STAFFEL = re.compile(r'(?:/[A-Z1-9]| (?:Girone|Gruppe|Staffel|Group|Grupo) \S+)$')
+
+
+def league_base(name):
+    """Liganame ohne Staffelendung: „Serie C/B“ → „Serie C“, „Regionalliga Gruppe Nord“ → „Regionalliga“."""
+    return _STAFFEL.sub('', name)
+
+
+def _mean_rep(teams, club_map):
+    reps = [club_map[t]['rep'] for t in teams if club_map.get(t, {}).get('rep')]
+    return sum(reps) / len(reps) if reps else None
+
+
+def league_tiers(league_list, club_map):
+    """Liga-ID → (Land, Stufe). Land = häufigstes Land der Vereine; Staffeln derselben Liga bilden eine Gruppe;
+    die Gruppen eines Landes nach mittlerer Vereinsreputation absteigend, Stufe 1 = höchste."""
+    groups = defaultdict(list)                        # (Land, Grundname) → Liga-IDs
+    for lid, lg in league_list.items():
+        nats = Counter(club_map.get(t, {}).get('nat') for t in lg['teams'])
+        nats.pop(None, None)
+        land = nats.most_common(1)[0][0] if nats else None
+        groups[(land, league_base(lg['name']))].append(lid)
+    by_land = defaultdict(list)
+    for (land, _base), lids in groups.items():
+        rep = _mean_rep([t for lid in lids for t in league_list[lid]['teams']], club_map) or 0
+        by_land[land].append((rep, lids))
+    out = {}
+    for land, entries in by_land.items():
+        entries.sort(key=lambda e: -e[0])
+        for tier, (_rep, lids) in enumerate(entries, 1):
+            for lid in lids:
+                out[lid] = (land, tier)
+    return out
+
+
+@dataclass
+class ScoutCtx:
+    """Was für die Prüfung „im Scoutinggebiet“ gebraucht wird (Stufe 1–7 wie SCOUT_AREAS)."""
+    area: int
+    nat: int                    # Land des eigenen Vereins (Datenbank-Nr.)
+    continent: int
+    region: int
+    league_teams: set
+    adjacent_teams: set
+    geo: dict                   # Land → (Kontinent, Region)
+    club_map: dict
+
+
+def in_scout_area(pl, ctx):
+    """Liegt der Spieler im Scoutinggebiet? Land = Land seines Vereins, bei Vereinslosen seine Nationalität."""
+    if ctx is None or ctx.area >= 7:
+        return True
+    club = pl['club']
+    if ctx.area == 1:
+        return club == 0 and pl.get('nat') == ctx.nat
+    if ctx.area == 2:
+        return club != 0 and club in ctx.league_teams
+    if ctx.area == 3:
+        return club != 0 and club in ctx.adjacent_teams
+    land = pl.get('nat') if club == 0 else ctx.club_map.get(club, {}).get('nat')
+    if land is None:
+        return False
+    if ctx.area == 4:
+        return land == ctx.nat
+    g = ctx.geo.get(land)
+    if g is None:
+        return False
+    if ctx.area == 5:
+        return g == (ctx.continent, ctx.region)
+    return g[0] == ctx.continent and g[0] != 255
+
+
+SCOUT_NOTE_MISSING = 'Scoutinggebiet nicht gefunden – Vorschläge aus allen Ländern.'
+SCOUT_NOTE_NO_FMS = 'Ohne fmsave kann das Scoutinggebiet nicht angewendet werden – Vorschläge aus allen Ländern.'
+VIS_POOL, QUALITY_POOL = 3000, 4000
+
+
 def _analyse(save, frames, names, cfg, progress):
     db = DB(frames[names['game_db']])
     log('Datenbank', len(db.d) // 1_000_000, 'MB')
@@ -818,6 +897,39 @@ def _analyse(save, frames, names, cfg, progress):
     lg_str = my_league.get('strength', my_str)
     log('Liga', my_league.get('name'), 'Stärke', round(lg_str, 1))
 
+    # Ligastufe, Länder und Scoutinggebiet: nur mit fmsave (der eigene Leser kennt kein Vereinsland)
+    from . import nations       # erst hier: nations importiert dieses Modul
+    ctx, scout_note, nnames, league_rep = None, None, {}, {}
+    my_nat = club_map.get(my_id, {}).get('nat')
+    my_lid = league_of.get(my_id)
+    if fd is not None:
+        tiers = league_tiers(league_list, club_map)
+        geo = nations.nation_geo(db.d)
+        nnames = nations.nation_names(lang)
+        league_rep = {lid: _mean_rep(lg['teams'], club_map) for lid, lg in league_list.items()}
+        log('Länder: Geodaten', len(geo), 'Namen', len(nnames))
+        my_land, my_tier = tiers.get(my_lid, (None, None))
+        adjacent = [lid for lid, (land, tier) in tiers.items()
+                    if my_tier is not None and land == my_land and abs(tier - my_tier) <= 1]
+        log('Eigene Ligastufe', my_tier, '| angrenzende Ligen:', ', '.join(sorted(league_list[l]['name'] for l in adjacent)))
+        g = geo.get(my_nat)
+        if scout_area is None or my_nat is None:
+            scout_note = SCOUT_NOTE_MISSING
+        elif scout_area in (5, 6) and (g is None or g[0] == 255):
+            scout_note = SCOUT_NOTE_MISSING
+        elif scout_area in (2, 3) and my_lid is None:
+            scout_note = SCOUT_NOTE_MISSING
+        else:
+            ctx = ScoutCtx(area=scout_area, nat=my_nat, continent=g[0] if g else 255, region=g[1] if g else 0,
+                           league_teams=set(comps[my_lid]['teams']) if my_lid in comps else set(),
+                           adjacent_teams={t for lid in adjacent for t in comps[lid]['teams']},
+                           geo=geo, club_map=club_map)
+    else:
+        scout_note = SCOUT_NOTE_NO_FMS
+    my_nat_code, my_nat_name = nations.nation_label(nnames, my_nat)
+    log('Scoutinggebiet angewendet:', SCOUT_AREAS.get(ctx.area) if ctx else f'nein ({scout_note})',
+        '| Vereinsland', my_nat_code)
+
     if fd is not None:
         if my_id not in fd.clubs:
             log('Eigener Verein nicht in den fmsave-Vereinen:', my_id, '- keine Finanzen')
@@ -848,9 +960,7 @@ def _analyse(save, frames, names, cfg, progress):
         own = club_str.get(pl['club'], 50 if free else my_str + 5)   # unbekannter Verein: neutral
         diff = own - my_str                       # >0: sein Verein ist stärker
         score = 75 - diff * 1.6
-        lvl_gap = pl['ca'] - my_str                # Spieler deutlich besser als unser Niveau
-        if lvl_gap > 10:
-            score -= (lvl_gap - 10) * 1.2
+        # Kein Abzug nach Spielerqualität: die Wechselchance ist auch in der Stufe „Aus“ sichtbar.
         p = pl['pers'] or [10] * 8
         # Reihenfolge: Anpassung, Ehrgeiz, Loyalität, Druck, Professionalität, Sportsgeist, Temperament, Kontroversität
         ambition, loyalty = p[1], p[2]
@@ -891,19 +1001,37 @@ def _analyse(save, frames, names, cfg, progress):
         else:
             r['will'] = willingness(pl)
             r['rel'] = rel_text(pl)
+            r['nat'], r['nat_name'] = nations.nation_label(nnames, pl.get('nat'))
+            mine_rep, his_rep = league_rep.get(my_lid), league_rep.get(lid)
+            r['weaker_league'] = bool(mine_rep and his_rep and his_rep < mine_rep)
         return r
 
     from_fms = fd is not None
     squad = [out_player(pl, True) for pl in players.values() if in_squad(pl, my_id, from_fms)]
     require_squad(squad, os.path.basename(save))
-    # Pool: Spieler, die für das eigene Niveau realistisch interessant sind
+    # Pool: nur Spieler im Scoutinggebiet, in zwei Auswahlen
+    area = [pl for pl in players.values() if in_pool_scope(pl, my_id, from_fms) and 16 <= age_of(pl['dob']) <= 35
+            and in_scout_area(pl, ctx)]
+    will = {pl['id']: willingness(pl) for pl in area}
+    # 1) „vis“: ohne CA/PA/Attribute ausgewählt – Wechselchance, dann Vertragsende (vertragslos zuerst)
+    def vis_key(pl):
+        end = con.get(pl['id'], {}).get('end')
+        return (-will[pl['id']], end is not None, end or '')
+    vis_sel = sorted(area, key=vis_key)[:VIS_POOL]
+    # 2) Qualität: Spieler, die für das eigene Niveau realistisch interessant sind (nur intern nach CA/PA)
     lo, hi = my_str - 15, my_str + 35
-    cand = [pl for pl in players.values() if in_pool_scope(pl, my_id, from_fms) and 16 <= age_of(pl['dob']) <= 35
-            and (lo <= pl['ca'] <= hi or (age_of(pl['dob']) <= 21 and pl['pa'] >= my_str + 10 and pl['ca'] >= lo - 25))]
-    # realistische Kandidaten zuerst: Wechselbereitschaft × Qualität
-    cand.sort(key=lambda pl: -(willingness(pl) * (pl['ca'] - lo + 10)))
-    pool = [out_player(pl, False) for pl in cand[:cfg.get('pool_size', 6000)]]
-    log('Kader', len(squad), 'Pool', len(pool))
+    qual = [pl for pl in area
+            if lo <= pl['ca'] <= hi or (age_of(pl['dob']) <= 21 and pl['pa'] >= my_str + 10 and pl['ca'] >= lo - 25)]
+    qual.sort(key=lambda pl: -(will[pl['id']] * (pl['ca'] - lo + 10)))
+    vis_ids = {pl['id'] for pl in vis_sel}
+    chosen = vis_sel + [pl for pl in qual[:QUALITY_POOL] if pl['id'] not in vis_ids]
+    pool = []
+    for pl in chosen:
+        r = out_player(pl, False)
+        r['vis'] = pl['id'] in vis_ids
+        pool.append(r)
+    log('Kader', len(squad), 'Pool', len(pool), '| im Scoutinggebiet', len(area), '| sichtbar (vis)', len(vis_sel),
+        '| Qualitätsauswahl', min(len(qual), QUALITY_POOL))
 
     # Taktik: Positionen + Rollen aus dem Spielstand, Anweisungen/Feedback aus config.json
     tactic = dict(club_cfg.get('tactic', {}))
@@ -939,6 +1067,8 @@ def _analyse(save, frames, names, cfg, progress):
     return dict(
         meta=dict(source=source, manager=manager, date=game_date.isoformat(), club=my.get('name'), club_short=my.get('short'),
                   scout_area=scout_area, scout_area_name=SCOUT_AREAS.get(scout_area),
+                  scout_filter=ctx.area if ctx else None, scout_note=scout_note,
+                  nat=my_nat_code, nat_name=my_nat_name,
                   league=my_league.get('name', ''), league_long=my_league.get('long', ''),
                   finances=fin, save=os.path.basename(save), created=datetime.datetime.now().isoformat(timespec='minutes'),
                   rivals=[club_map.get(t, {}).get('short', '') for t in my_league.get('teams', []) if t != my_id]),
