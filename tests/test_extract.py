@@ -162,7 +162,9 @@ def test_osijek_reads_first_team_from_fmsave(osijek_save):
     assert m["league"] == "First League" and len(m["rivals"]) == 9
     assert 20 <= len(data["squad"]) <= 30 and len(data["pool"]) > 1000
     f = m["finances"]                                                # per Screenshot bestätigt (14.11.)
-    assert f["wage_budget_week"] == 50451 and f["transfer_budget"] == 499998 and f["balance"] == 6713387
+    assert f["wage_budget_week"] == 50451 and f["transfer_budget"] == 499998
+    # Der Kontostand ändert sich, wenn der Nutzer weiterspielt (Screenshot 14.11.: 6.713.387)
+    assert isinstance(f["balance"], int) and f["balance"] > 0
     assert f["wage_payroll_week"] == 45680              # Gehaltskosten gesamt laut Screenshot
 
 
@@ -224,6 +226,37 @@ def test_club_without_league_outside_league_areas():
     assert X.in_scout_area(pl, ctx) is False
     ctx.area = 4
     assert X.in_scout_area(pl, ctx) is True
+
+
+def test_weaker_league_compares_groups():
+    clubs = {1: dict(nat=776, rep=4500), 2: dict(nat=776, rep=4500), 3: dict(nat=776, rep=4200),
+             4: dict(nat=776, rep=3000), 5: dict(nat=776, rep=4268), 6: dict(nat=769, rep=4000)}
+    ll = {1: dict(name='Serie C/B', teams=[1, 2]), 2: dict(name='Serie C/A', teams=[3]),
+          3: dict(name='Serie D/A', teams=[4]), 4: dict(name='Eccellenza', teams=[5]),
+          5: dict(name='3. Liga', teams=[6])}
+    g = X.league_groups(ll, clubs)
+    assert g[1] == g[2] == (776, 'Serie C', 4400)    # eigene Gruppe: Mittel aller Staffeln
+    assert X.weaker_league(g, 1, 2) is False         # gleiche Gruppe, obwohl die Staffel C/A schwächer ist
+    assert X.weaker_league(g, 1, 3) is True          # 3000 gegen 4400
+    assert X.weaker_league(g, 1, 4) is False         # 4268 = 97 % der eigenen Gruppe
+    assert X.weaker_league(g, 1, 5) is True          # anderes Land, gleiche Regel: 4000 < 0,95 × 4400
+    assert X.weaker_league(g, 1, None) is False      # Verein ohne Liga
+    assert X.weaker_league(g, None, 3) is False      # eigene Liga unbekannt
+
+
+def test_scout_context_needs_own_league_for_league_areas():
+    tiers = {22: (776, 1), 23: (776, 2), 24: (776, 3), 30: (769, 1)}
+    comps = {22: dict(teams=[1]), 23: dict(teams=[2]), 24: dict(teams=[3]), 30: dict(teams=[4])}
+    geo = {776: (2, 11)}
+    for area in (2, 3):
+        ctx, note = X.scout_context(area, 776, None, tiers, comps, geo, {})
+        assert ctx is None and note == X.SCOUT_NOTE_MISSING
+    ctx, note = X.scout_context(3, 776, 23, tiers, comps, geo, {})
+    assert note is None and ctx.league_teams == {2} and ctx.adjacent_teams == {1, 2, 3}
+    ctx, note = X.scout_context(4, 776, None, tiers, comps, geo, {})
+    assert note is None and ctx.area == 4
+    assert X.scout_context(5, 769, 30, tiers, comps, geo, {}) == (None, X.SCOUT_NOTE_MISSING)   # keine Geodaten
+    assert X.scout_context(None, 776, 22, tiers, comps, geo, {}) == (None, X.SCOUT_NOTE_MISSING)
 
 
 @pytest.mark.save

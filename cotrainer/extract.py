@@ -711,26 +711,45 @@ def _mean_rep(teams, club_map):
     return sum(reps) / len(reps) if reps else None
 
 
-def league_tiers(league_list, club_map):
-    """Liga-ID → (Land, Stufe). Land = häufigstes Land der Vereine; Staffeln derselben Liga bilden eine Gruppe;
-    die Gruppen eines Landes nach mittlerer Vereinsreputation absteigend, Stufe 1 = höchste."""
+def league_groups(league_list, club_map):
+    """Liga-ID → (Land, Grundname, mittlere Reputation der Gruppe oder None). Land = häufigstes Land der Vereine;
+    Staffeln derselben Liga (gleiches Land, gleicher league_base) bilden eine Gruppe."""
     groups = defaultdict(list)                        # (Land, Grundname) → Liga-IDs
     for lid, lg in league_list.items():
         nats = Counter(club_map.get(t, {}).get('nat') for t in lg['teams'])
         nats.pop(None, None)
         land = nats.most_common(1)[0][0] if nats else None
         groups[(land, league_base(lg['name']))].append(lid)
-    by_land = defaultdict(list)
-    for (land, _base), lids in groups.items():
-        rep = _mean_rep([t for lid in lids for t in league_list[lid]['teams']], club_map) or 0
-        by_land[land].append((rep, lids))
+    out = {}
+    for (land, base), lids in groups.items():
+        rep = _mean_rep([t for lid in lids for t in league_list[lid]['teams']], club_map)
+        for lid in lids:
+            out[lid] = (land, base, rep)
+    return out
+
+
+def league_tiers(league_list, club_map):
+    """Liga-ID → (Land, Stufe): die Gruppen eines Landes nach mittlerer Vereinsreputation absteigend, Stufe 1 = höchste."""
+    by_land = defaultdict(dict)                       # Land → {Grundname: (Reputation, [Liga-IDs])}
+    for lid, (land, base, rep) in league_groups(league_list, club_map).items():
+        by_land[land].setdefault(base, (rep or 0, []))[1].append(lid)
     out = {}
     for land, entries in by_land.items():
-        entries.sort(key=lambda e: -e[0])
-        for tier, (_rep, lids) in enumerate(entries, 1):
+        for tier, (_rep, lids) in enumerate(sorted(entries.values(), key=lambda e: -e[0]), 1):
             for lid in lids:
                 out[lid] = (land, tier)
     return out
+
+
+WEAKER_LEAGUE = 0.95        # schwächere Liga: Gruppenreputation unter 95 % der eigenen
+
+
+def weaker_league(groups, my_lid, lid):
+    """Spielt die Liga lid in einer klar schwächeren Gruppe als die eigene? Gleiche Gruppe oder unbekannt: False."""
+    mine, his = groups.get(my_lid), groups.get(lid)
+    if not mine or not his or mine[:2] == his[:2] or not mine[2] or not his[2]:
+        return False
+    return his[2] < WEAKER_LEAGUE * mine[2]
 
 
 @dataclass
@@ -773,6 +792,27 @@ def in_scout_area(pl, ctx):
 SCOUT_NOTE_MISSING = 'Scoutinggebiet nicht gefunden – Vorschläge aus allen Ländern.'
 SCOUT_NOTE_NO_FMS = 'Ohne fmsave kann das Scoutinggebiet nicht angewendet werden – Vorschläge aus allen Ländern.'
 VIS_POOL, QUALITY_POOL = 3000, 4000
+
+
+def adjacent_leagues(tiers, my_lid):
+    """Ligen desselben Landes mit Stufe eigene ± 1, eigene Liga eingeschlossen; [] ohne eigene Liga."""
+    if my_lid not in tiers:
+        return []
+    my_land, my_tier = tiers[my_lid]
+    return [lid for lid, (land, tier) in tiers.items() if land == my_land and abs(tier - my_tier) <= 1]
+
+
+def scout_context(scout_area, my_nat, my_lid, tiers, comps, geo, club_map):
+    """(ScoutCtx, None) oder (None, Hinweistext), wenn das Gebiet nicht angewendet werden kann."""
+    g = geo.get(my_nat)
+    if (scout_area is None or my_nat is None
+            or (scout_area in (5, 6) and (g is None or g[0] == 255))
+            or (scout_area in (2, 3) and my_lid not in tiers)):
+        return None, SCOUT_NOTE_MISSING
+    return ScoutCtx(area=scout_area, nat=my_nat, continent=g[0] if g else 255, region=g[1] if g else 0,
+                    league_teams=set(comps.get(my_lid, {}).get('teams', ())),
+                    adjacent_teams={t for lid in adjacent_leagues(tiers, my_lid) for t in comps[lid]['teams']},
+                    geo=geo, club_map=club_map), None
 
 
 def _analyse(save, frames, names, cfg, progress):
@@ -899,31 +939,18 @@ def _analyse(save, frames, names, cfg, progress):
 
     # Ligastufe, Länder und Scoutinggebiet: nur mit fmsave (der eigene Leser kennt kein Vereinsland)
     from . import nations       # erst hier: nations importiert dieses Modul
-    ctx, scout_note, nnames, league_rep = None, None, {}, {}
+    ctx, scout_note, nnames, groups = None, None, {}, {}
     my_nat = club_map.get(my_id, {}).get('nat')
     my_lid = league_of.get(my_id)
     if fd is not None:
         tiers = league_tiers(league_list, club_map)
+        groups = league_groups(league_list, club_map)
         geo = nations.nation_geo(db.d)
         nnames = nations.nation_names(lang)
-        league_rep = {lid: _mean_rep(lg['teams'], club_map) for lid, lg in league_list.items()}
         log('Länder: Geodaten', len(geo), 'Namen', len(nnames))
-        my_land, my_tier = tiers.get(my_lid, (None, None))
-        adjacent = [lid for lid, (land, tier) in tiers.items()
-                    if my_tier is not None and land == my_land and abs(tier - my_tier) <= 1]
-        log('Eigene Ligastufe', my_tier, '| angrenzende Ligen:', ', '.join(sorted(league_list[l]['name'] for l in adjacent)))
-        g = geo.get(my_nat)
-        if scout_area is None or my_nat is None:
-            scout_note = SCOUT_NOTE_MISSING
-        elif scout_area in (5, 6) and (g is None or g[0] == 255):
-            scout_note = SCOUT_NOTE_MISSING
-        elif scout_area in (2, 3) and my_lid is None:
-            scout_note = SCOUT_NOTE_MISSING
-        else:
-            ctx = ScoutCtx(area=scout_area, nat=my_nat, continent=g[0] if g else 255, region=g[1] if g else 0,
-                           league_teams=set(comps[my_lid]['teams']) if my_lid in comps else set(),
-                           adjacent_teams={t for lid in adjacent for t in comps[lid]['teams']},
-                           geo=geo, club_map=club_map)
+        log('Eigene Ligastufe', tiers.get(my_lid, (None, None))[1], '| angrenzende Ligen:',
+            ', '.join(sorted(league_list[l]['name'] for l in adjacent_leagues(tiers, my_lid))))
+        ctx, scout_note = scout_context(scout_area, my_nat, my_lid, tiers, comps, geo, club_map)
     else:
         scout_note = SCOUT_NOTE_NO_FMS
     my_nat_code, my_nat_name = nations.nation_label(nnames, my_nat)
@@ -1002,8 +1029,7 @@ def _analyse(save, frames, names, cfg, progress):
             r['will'] = willingness(pl)
             r['rel'] = rel_text(pl)
             r['nat'], r['nat_name'] = nations.nation_label(nnames, pl.get('nat'))
-            mine_rep, his_rep = league_rep.get(my_lid), league_rep.get(lid)
-            r['weaker_league'] = bool(mine_rep and his_rep and his_rep < mine_rep)
+            r['weaker_league'] = weaker_league(groups, my_lid, lid)
         return r
 
     from_fms = fd is not None
