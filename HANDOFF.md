@@ -304,10 +304,11 @@ Grundlage: `Trainertest 2.fm` (unverändert) gegen `Trainertest 2 traainer.fm` (
 - Das Programm schlägt den neuesten `.fm` des gemerkten Ordners vor. Im Konsolenlauf wird ohne Pfad der neueste `.fm` verwendet, außer `config.json` gibt mit `save` einen anderen vor.
 - **CA, PA und versteckte Attribute** werden nur intern benutzt (Bewertung, Wechselchance, Marktwert). Die JSON-Ausgabe enthält sie nicht. Spielerqualität erscheint nur als Text (`pot`, `lvl`) bzw. als relative Einordnung (`rel`).
 - **Wechselchance** ist eine eigene Schätzung (0–100). Sie berücksichtigt:
-  - Vereinsstärke: Mittelwert der Top-16-CA
-  - Ehrgeiz und Loyalität aus der Persönlichkeit
+  - Abstand der Vereinsreputation (fmsave); im eigenen Leser gelten alle Vereine als gleich groß
   - Restlaufzeit des Vertrags, Alter, Vereinslosigkeit
   - Unbekannte Vereine gelten als neutral.
+  - **Keine Persönlichkeit** (Ehrgeiz, Loyalität) und keine Spielerqualität: beides sieht man im Spiel ohne Scouting nicht (Entscheidung des Nutzers, 15.11.).
+- **Stufe „Scoutbericht“** zeigt keine Zahlen „Fit“ und „+ zur Startelf“; die gibt es nur in „Werte“ (Entscheidung des Nutzers, 15.11.).
 - **Marktwert** ist eine eigene Schätzung: `2200·e^((CA−50)/12,5)` mit Faktoren für Alter, Vertrag und Liga. Es ist kein Spielwert.
 - **Eigener Verein:** der Verein mit den meisten Spielern in den Trainingsbewertungen; sonst der Name aus `save_game_summary`.
 - **Taktik:**

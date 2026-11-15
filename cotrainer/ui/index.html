@@ -439,11 +439,11 @@ function renderSug(){const el=document.getElementById('sug');if(!el)return;const
  const sorters={gain:(a,b)=>b.gain-a.gain,will:(a,b)=>b.p.will-a.p.will||b.gain-a.gain,value:(a,b)=>a.p.val-b.p.val,young:(a,b)=>a.p.age-b.p.age||b.gain-a.gain};
  rows.sort(sorters[sortKey()]);const top=rows.slice(0,80);
  if(!top.length){el.innerHTML='<div class="muted" style="padding:30px;text-align:center">Keine passenden Kandidaten – Filter lockern (Alter, Wechselchance, Budget).</div>';return;}
- el.innerHTML=`<div class="tblw"><table class="tbl"><thead><tr><th>Fit</th><th>Spieler</th><th>Position</th><th class="num">+ zur Startelf</th><th>Entwicklung</th>${rep?'<th>Einordnung</th><th>Bericht</th>':''}<th class="num">Wechselchance</th><th class="num">Preis (geschätzt)</th><th class="num">Gehalt/Jahr</th><th>Vertrag</th></tr></thead><tbody>
+ el.innerHTML=`<div class="tblw"><table class="tbl"><thead><tr>${rep?'':'<th>Fit</th>'}<th>Spieler</th><th>Position</th>${rep?'':'<th class="num">+ zur Startelf</th>'}<th>Entwicklung</th>${rep?'<th>Einordnung</th><th>Bericht</th>':''}<th class="num">Wechselchance</th><th class="num">Preis (geschätzt)</th><th class="num">Gehalt/Jahr</th><th>Vertrag</th></tr></thead><tbody>
  ${top.map(x=>{const p=x.p,s=sl[x.i],w=p.will,wc=w>=60?'good':w>=35?'':w>=20?'warn':'bad';
-  return`<tr class="click" onclick="openPlayer(${p.id},${x.i})"><td><div class="fit" style="--v:${Math.round(x.sc)};--c:var(--acc)"><span>${Math.round(x.sc)}</span></div></td>
+  return`<tr class="click" onclick="openPlayer(${p.id},${x.i})">${rep?'':`<td><div class="fit" style="--v:${Math.round(x.sc)};--c:var(--acc)"><span>${Math.round(x.sc)}</span></div></td>`}
   <td><div class="pname">${esc(p.n)}</div><div class="psub">${p.age} J. · ${esc(p.club||'vereinslos')}${p.lg?' · '+esc(p.lg):''}</div></td>
-  <td>${PDE[s.pos]}<div class="psub">${esc(ROLES[s.ip].name)}</div></td><td class="num good"><b>+${Math.round(x.gain)}</b></td>
+  <td>${PDE[s.pos]}<div class="psub">${esc(ROLES[s.ip].name)}</div></td>${rep?'':`<td class="num good"><b>+${Math.round(x.gain)}</b></td>`}
   <td class="psub" style="max-width:240px">${esc(p.pot)}</td>${rep?`<td class="psub">${p.rel?esc(p.rel)+' als dein Kader':'–'}</td><td class="psub" style="max-width:260px">${scoutLines(p,s).map(esc).join('<br>')}</td>`:''}<td class="num"><b class="${wc}">${w} %</b></td>
   <td class="num">${money(p.val)}${p.val>bud?'<div><span class="pill b">über Budget</span></div>':''}</td><td class="num">${money(yr(p.wage))}${p.wage>(f.wage_budget_week||0)*0.08?'<div><span class="pill w">teuer</span></div>':''}</td>
   <td class="psub">${p.end?new Date(p.end).toLocaleDateString('de-DE'):'–'}</td></tr>`;}).join('')}</tbody></table></div>

@@ -279,7 +279,7 @@ def test_willingness_uses_club_reputation():
     assert X.club_rep_diff(0, 1, cm) == X.FREE_AGENT_DIFF
 
     def will(club, free=False):
-        return X.willingness_score(X.club_rep_diff(club, 1, cm), free, [10, 15, 12] + [10] * 5, 2.0, 26)
+        return X.willingness_score(X.club_rep_diff(club, 1, cm), free, 2.0, 26)
     assert will(2) < will(4) < will(3)                           # größerer Verein → geringere Chance
     assert will(4) == will(5) == will(1)                         # unbekannt = gleich groß
     assert will(0, free=True) > will(3)
@@ -368,6 +368,15 @@ def test_own_reader_willingness_ignores_ca():
     assert len(outs) == 1
     assert X.club_diff(5, 1, cm, False) == 0 and X.club_diff(0, 1, cm, False) == X.FREE_AGENT_DIFF
     assert X.player_willingness(dict(base, club=1), 1, cm, False, 2.0, 26) is None
+
+
+def test_willingness_ignores_personality():
+    # Ehrgeiz und Loyalität sieht man im Spiel ohne Scouting nicht → keine Wirkung auf die Wechselchance
+    cm = {1: dict(rep=4300), 2: dict(rep=7100), 3: dict(rep=3000)}
+    for club in (2, 3, 0):
+        outs = {X.player_willingness(dict(id=1, club=club, pers=pers), 1, cm, True, 2.0, 26)
+                for pers in ([10] * 8, [1, 20, 20] + [10] * 5, [20, 1, 1] + [1] * 5, None)}
+        assert len(outs) == 1
 
 
 def test_rep_diff_cap_for_small_clubs():

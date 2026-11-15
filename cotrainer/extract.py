@@ -830,8 +830,7 @@ def player_willingness(pl, my_id, club_map, from_fms, years_left, age):
     """Wechselchance eines fremden Spielers (None für eigene); nutzt keine Spielerqualität."""
     if pl['club'] == my_id:
         return None
-    return willingness_score(club_diff(pl['club'], my_id, club_map, from_fms), pl['club'] == 0, pl['pers'],
-                             years_left, age)
+    return willingness_score(club_diff(pl['club'], my_id, club_map, from_fms), pl['club'] == 0, years_left, age)
 
 
 def pool_relevance(pl, club_map, my_nat, near_lids, league_of):
@@ -849,15 +848,10 @@ def pool_relevance(pl, club_map, my_nat, near_lids, league_of):
     return 2
 
 
-def willingness_score(diff, free, pers, years_left, age):
-    """0-100: Wechselchance aus Vereinsabstand, Persönlichkeit (intern), Vertragsrest und Alter; keine Spielerqualität."""
+def willingness_score(diff, free, years_left, age):
+    """0-100: Wechselchance aus Vereinsabstand, Vertragsrest und Alter. Keine Spielerqualität und keine
+    Persönlichkeit (Ehrgeiz, Loyalität): beides sieht man im Spiel ohne Scouting nicht."""
     score = WILL_BASE - diff * 1.6
-    p = pers or [10] * 8
-    # Reihenfolge: Anpassung, Ehrgeiz, Loyalität, Druck, Professionalität, Sportsgeist, Temperament, Kontroversität
-    ambition, loyalty = p[1], p[2]
-    if diff > 0:
-        score -= (ambition - 10) * 1.5
-    score -= (loyalty - 10) * 1.0
     if years_left is not None:
         score += 12 if years_left < 0.6 else 5 if years_left < 1.2 else -4 if years_left > 3 else 0
     if free:
