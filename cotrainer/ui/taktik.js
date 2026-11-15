@@ -79,7 +79,77 @@
     return out;
   }
 
-  const api = {AREAS, areaRatings, helpFor};
+  const C = (key, name, desc, tendency, sure) => ({key, name, desc, tendency, sure});
+  const LEADERSHIP = {
+    training: [
+      C('offensive', 'Offensive', 'Attraktiver Offensivfußball.', 'Spielt offensiven Fußball', true),
+      C('defensiv', 'Defensiv', 'Die Null muss stehen.', 'Spielt soliden Defensivfußball', true),
+      C('entwickler', 'Entwickler', 'Junge Talente fördern.', 'Entwickelt Nachwuchsspieler', true),
+      C('energisch', 'Energisch', 'Gegner mit flottem Tempo-Fußball überrennen.', 'Spielt dynamischen Fußball', true),
+      C('entertainer', 'Entertainer', 'Ansehnlicher, packender Fußball für die Fans.', 'Spielt unterhaltsamen Fußball', true),
+      C('pragmatiker', 'Pragmatiker', 'Der schnellste und einfachste Weg zum Sieg.', 'Spielt vertikalen Fußball', false),
+      C('spezialist', 'Spezialist', 'Fokus auf Torwarttraining und Fitness.', 'Spezialist', true),
+      C('laptop', 'Laptop-Trainer', 'Ballbesitzorientiert und bei Standards effektiv.', 'Holt das Optimum aus Standardsituationen heraus', false),
+      C('taktiker', 'Taktiker', 'Kleinste taktische Details.', 'Taktiktüftler', false),
+    ],
+    mental: [
+      C('erfolgshungrig', 'Erfolgshungrig', 'Zielstrebig, will alles selbst kontrollieren.', 'Sehr ambitioniert', false),
+      C('diszipliniert', 'Diszipliniert', 'Disziplin und hohe Standards.', 'Absoluter Disziplinfanatiker', false),
+      C('belastbar', 'Belastbar', 'Steht nach Rückschlägen sofort wieder auf.', 'Geborener Führungsspieler', false),
+      C('ueberzeugend', 'Überzeugend', 'Reißt Menschen mit.', 'Leidenschaftlicher Motivator', false),
+      C('inspirierend', 'Inspirierend', 'Starke, präsente Führungspersönlichkeit.', 'Inspiriert andere', false),
+      C('gut', 'Gut', 'Passt sich jeder Liga und jedem Land an.', 'Allseits bekannter Erfolgstyp', false),
+    ],
+  };
+  const LEAD_MAX = {training: 3, mental: 2};
+
+  function cleanLead(sel) {
+    const out = {};
+    for (const g of Object.keys(LEAD_MAX)) {
+      const ok = LEADERSHIP[g].map(c => c.key), seen = [];
+      for (const k of ((sel && sel[g]) || [])) if (ok.includes(k) && !seen.includes(k)) seen.push(k);
+      out[g] = seen.slice(0, LEAD_MAX[g]);
+    }
+    return out;
+  }
+
+  function coachHints(coaching, rated) {
+    const out = [], c = coaching || {};
+    for (const a of rated || []) {
+      if (a.band !== 'schwach') continue;
+      for (const r of a.coach || []) {
+        if (c[r] !== 'Sehr schlecht' && c[r] !== 'Schlecht') continue;
+        const t = '„' + a.name + '“ ist schwach, und deine Trainerbewertung ' + r + ' ist „' + c[r] + '“ – einen Co-Trainer mit Stärke in ' + r + ' diese Einheit leiten lassen.';
+        if (!out.includes(t)) out.push(t);
+      }
+    }
+    return out;
+  }
+
+  function leadHints(sel, ctx) {
+    const s = cleanLead(sel), has = k => s.training.includes(k) || s.mental.includes(k);
+    const fam = ctx && ctx.family, sk = ctx && ctx.styleKey, out = [];
+    const add = (kind, text) => out.push({kind, text});
+    if (has('defensiv') && (fam === 'pressing' || sk === 'vertical_tikitaka'))
+      add('konflikt', 'Hohes Pressing passt nicht zu deinem Ruf als Defensivtrainer – Spieler lassen sich davon schwerer überzeugen.');
+    if (has('offensive') && fam === 'counter') add('konflikt', 'Konterfußball aus tiefem Block passt nicht zu deinem offensiven Ruf.');
+    if (has('offensive') && ['possession', 'pressing', 'wide'].includes(fam))
+      add('passt', 'Dein offensiver Ruf passt zum Spielstil – das hilft beim Überzeugen der Spieler.');
+    if (has('energisch') && sk === 'tikitaka') add('konflikt', 'Geduldiges Tiki-Taka passt nicht zu deinem Ruf für flotten Tempo-Fußball.');
+    if (has('energisch') && (['pressing', 'counter', 'direct'].includes(fam) || sk === 'vertical_tikitaka'))
+      add('passt', 'Dein Ruf für Tempo-Fußball passt zum Spielstil.');
+    if (has('laptop') && ['counter', 'direct'].includes(fam))
+      add('konflikt', 'Als Laptop-Trainer stehst du für Ballbesitz – dein Spielstil verzichtet darauf.');
+    if (has('pragmatiker') && sk === 'tikitaka')
+      add('konflikt', 'Geduldiges Tiki-Taka passt nicht zu deinem Ruf, auf dem schnellsten Weg zum Sieg zu spielen.');
+    if (has('entwickler') && ctx && ctx.avgAge > 27)
+      add('hinweis', 'Deine Startelf ist im Schnitt ' + ctx.avgAge.toLocaleString('de-DE', {maximumFractionDigits: 1, minimumFractionDigits: 1}) + ' Jahre alt – mehr junge Spieler einbauen passt zu deinem Ruf.');
+    if (has('taktiker'))
+      add('passt', 'Mehrere Taktiken für verschiedene Gegner einüben (Trainingseinheit „Geheimtraining“) passt zu deinem Ruf.');
+    return out;
+  }
+
+  const api = {AREAS, areaRatings, helpFor, LEADERSHIP, LEAD_MAX, cleanLead, coachHints, leadHints};
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.TAKTIK = api;
 })(this);

@@ -62,3 +62,28 @@ test('helpFor ohne bessere Rolle: nur Training und Transfer', () => {
   assert.deepEqual(h.map(x=>x.kind), ['training','transfer']);
   assert.match(h[0].text, /^Trainingseinheit „Pressingintensität“ einplanen; individueller Trainingsfokus auf /);
 });
+test('coachHints: schwacher Bereich plus schwache Bewertung', () => {
+  const rated = [{key:'intens',name:'Pressingintensität',band:'schwach',coach:['Fitness','Defensive']},
+                 {key:'pass',name:'Passstil',band:'gut',coach:['Ballbesitz']}];
+  const h = T.coachHints({Fitness:'Schlecht',Defensive:'Gut',Ballbesitz:'Sehr schlecht'}, rated);
+  assert.deepEqual(h, ['„Pressingintensität“ ist schwach, und deine Trainerbewertung Fitness ist „Schlecht“ – einen Co-Trainer mit Stärke in Fitness diese Einheit leiten lassen.']);
+  assert.deepEqual(T.coachHints({}, rated), []);
+});
+test('LEADERSHIP: 9 Trainings- und 6 Mentalkarten, Grenzen 3 und 2', () => {
+  assert.equal(T.LEADERSHIP.training.length, 9); assert.equal(T.LEADERSHIP.mental.length, 6);
+  assert.deepEqual(T.LEAD_MAX, {training:3, mental:2});
+  assert.equal(T.LEADERSHIP.training.find(c=>c.key==='defensiv').tendency, 'Spielt soliden Defensivfußball');
+});
+test('cleanLead: unbekannte und überzählige Karten fallen weg', () => {
+  assert.deepEqual(T.cleanLead(undefined), {training:[], mental:[]});
+  assert.deepEqual(T.cleanLead({training:['offensive','gibtsnicht','offensive','entwickler','energisch','taktiker'], mental:['gut','belastbar','diszipliniert']}),
+    {training:['offensive','entwickler','energisch'], mental:['gut','belastbar']});
+});
+test('leadHints: Konflikt, Passung, Alter', () => {
+  const sel = t => ({training:t, mental:[]});
+  assert.deepEqual(T.leadHints(sel(['defensiv']), {family:'possession',styleKey:'vertical_tikitaka',avgAge:25}).map(x=>x.kind), ['konflikt']);
+  assert.deepEqual(T.leadHints(sel(['offensive']), {family:'counter',styleKey:'counter',avgAge:25}).map(x=>x.kind), ['konflikt']);
+  const y = T.leadHints(sel(['entwickler']), {family:'possession',styleKey:'tikitaka',avgAge:28.44});
+  assert.equal(y[0].text, 'Deine Startelf ist im Schnitt 28,4 Jahre alt – mehr junge Spieler einbauen passt zu deinem Ruf.');
+  assert.deepEqual(T.leadHints(sel([]), {family:'pressing',styleKey:'gegenpress',avgAge:30}), []);
+});
