@@ -43,6 +43,21 @@ def test_unknown_theme_is_rejected(api):
     assert api.set_theme("lila")["ok"] is False and api.get_state()["theme"] == "dark"
 
 
+def test_info_level_roundtrip(tmp_path):
+    f = tmp_path / 'settings.json'
+    a = api_mod.Api(settings_file=str(f))
+    assert a.get_state()['info_level'] == 'aus'
+    assert a.set_info_level('werte', True) == {'ok': True}
+    s = api_mod.Api(settings_file=str(f)).get_state()
+    assert s['info_level'] == 'werte' and s['skip_spoiler_warning'] is True
+
+
+def test_info_level_rejects_unknown(tmp_path):
+    a = api_mod.Api(settings_file=str(tmp_path / 's.json'))
+    assert a.set_info_level('alles')['ok'] is False
+    assert a.get_state()['info_level'] == 'aus'
+
+
 def test_game_dir_without_lang_db_is_rejected(api, tmp_path):
     assert api.set_game_dir(str(tmp_path))["ok"] is False
     assert api.get_state()["lang_db_found"] is False

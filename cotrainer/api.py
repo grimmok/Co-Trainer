@@ -44,6 +44,7 @@ class Api:
     def get_state(self):
         remembered = self._settings.saves_dir
         state = dict(saves_dir=remembered, suggested_dir=saves.default_saves_dir(), theme=self._settings.theme,
+                     info_level=self._settings.info_level, skip_spoiler_warning=self._settings.skip_spoiler_warning,
                      version=__version__, saves=[], lang_db_found=bool(self._lang_db()))
         if remembered and not os.path.isdir(remembered):
             state['saves_dir'] = None
@@ -86,6 +87,16 @@ class Api:
         if theme not in settings.THEMES:
             return dict(ok=False, error='Unbekanntes Farbschema.')
         self._settings.theme = theme
+        self._save_settings()
+        return dict(ok=True)
+
+    def set_info_level(self, level, skip_warning=None):
+        """Informationsstufe der Transfervorschläge; skip_warning None lässt den gespeicherten Wert unverändert."""
+        if level not in settings.INFO_LEVELS:
+            return dict(ok=False, error='Unbekannte Informationsstufe.')
+        self._settings.info_level = level
+        if skip_warning is not None:
+            self._settings.skip_spoiler_warning = bool(skip_warning)
         self._save_settings()
         return dict(ok=True)
 
